@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // --- URL de tu script "Todo en Uno" ---
-    // He pegado la URL que me diste.
+    // Esta es la URL que me diste, ¡parece estar funcionando!
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     // --- Auth Guard ---
@@ -25,13 +25,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const crmTab = document.getElementById("crm-tab-button");
     const contactosTab = document.getElementById("contactos-tab-button");
     const reportesTab = document.getElementById("reportes-tab-button");
-    const archivadosTab = document.getElementById("archivados-tab-button"); // NUEVO
+    const archivadosTab = document.getElementById("archivados-tab-button"); 
     
     // Cuerpos de las Tablas
     const crmTBody = document.getElementById("crm-table-body");
     const contactosTBody = document.getElementById("contactos-table-body");
     const reportesTBody = document.getElementById("reportes-table-body");
-    const archivadosTBody = document.getElementById("archivados-table-body"); // NUEVO
+    const archivadosTBody = document.getElementById("archivados-table-body"); 
 
     // Filtros de Fecha
     const filterTodayBtn = document.getElementById("filter-today");
@@ -47,13 +47,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchCRM = document.getElementById("search-crm");
     const searchContactos = document.getElementById("search-contactos");
     const searchReportes = document.getElementById("search-reportes");
-    const searchArchivados = document.getElementById("search-archivados"); // NUEVO
+    const searchArchivados = document.getElementById("search-archivados"); 
     
     // Botones de Exportar
     const exportCRM = document.getElementById("export-crm-button");
     const exportContactos = document.getElementById("export-contactos-button");
     const exportReportes = document.getElementById("export-reportes-button");
-    const exportArchivados = document.getElementById("export-archivados-button"); // NUEVO
+    const exportArchivados = document.getElementById("export-archivados-button"); 
 
     // Gráficos
     const statusChartCtx = document.getElementById('status-chart')?.getContext('2d');
@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let typeChartInstance = null;
     
     // Caché de datos
-    let globalDataCache = { crm: [], contactos: [], reportes: [], archivados: [] }; // NUEVO
+    let globalDataCache = { crm: [], contactos: [], reportes: [], archivados: [] }; 
     
     // Estado de Filtros
     let currentFilters = {
@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
         searchCRM: "",
         searchContactos: "",
         searchReportes: "",
-        searchArchivados: "" // NUEVO
+        searchArchivados: "" 
     };
 
     // Modal de Confirmación
@@ -104,8 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentFilters.searchReportes = searchReportes.value.toLowerCase();
         renderAllTables(getFilteredData());
     });
-    // Listener para el nuevo buscador de archivados
-    searchArchivados?.addEventListener("keyup", () => { // NUEVO
+    searchArchivados?.addEventListener("keyup", () => { 
         currentFilters.searchArchivados = searchArchivados.value.toLowerCase();
         renderAllTables(getFilteredData());
     });
@@ -114,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
     exportCRM.addEventListener("click", () => exportToCSV(getFilteredData().crm, "reporte_crm.csv"));
     exportContactos.addEventListener("click", () => exportToCSV(getFilteredData().contactos, "reporte_contactos.csv"));
     exportReportes.addEventListener("click", () => exportToCSV(getFilteredData().reportes, "reporte_averias.csv"));
-    exportArchivados?.addEventListener("click", () => exportToCSV(getFilteredData().archivados, "reporte_archivados.csv")); // NUEVO
+    exportArchivados?.addEventListener("click", () => exportToCSV(getFilteredData().archivados, "reporte_archivados.csv")); 
 
     // Listeners de Filtros de Fecha
     filterTodayBtn.addEventListener("click", () => applyDateFilter('today'));
@@ -123,29 +122,51 @@ document.addEventListener("DOMContentLoaded", () => {
     filterRangeBtn.addEventListener("click", () => applyDateFilter('range'));
     filterClearBtn.addEventListener("click", () => applyDateFilter('all'));
 
-    // Listener del Modal
+    // --- [CORRECCIÓN DEFINITIVA] ---
+    // --- Listener del Botón "Archivar" del Modal ---
     confirmActionButton.addEventListener('click', () => {
         if (rowIdToAction) {
-            executeArchiveRow(rowIdToAction);
-            rowIdToAction = null;
+            const currentId = rowIdToAction;
+            rowIdToAction = null; // Limpia el ID para evitar doble clic
+
+            // Muestra un spinner en el botón y lo deshabilita
+            confirmActionButton.disabled = true;
+            confirmActionButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Archivando...';
+
+            executeArchiveRow(currentId)
+                .then(() => {
+                    // Si la promesa se resuelve (éxito), cierra el modal
+                    confirmModal.hide();
+                })
+                .catch(() => {
+                    // Si la promesa se rechaza (error), NO cierra el modal.
+                    // El error ya se mostró en la función executeArchiveRow.
+                    // Esto permite al usuario ver el error.
+                })
+                .finally(() => {
+                    // Se ejecuta siempre (éxito o error)
+                    // Vuelve a habilitar el botón y restaura su texto
+                    confirmActionButton.disabled = false;
+                    confirmActionButton.innerHTML = 'Archivar';
+                });
+
+        } else {
+             // Si no hay ID (caso raro), simplemente cierra el modal
+             confirmModal.hide();
         }
-        confirmModal.hide();
     });
 
-    // --- [BUG FIX] DELEGACIÓN DE EVENTOS PARA BOTONES ---
-    // Este método es más robusto y arregla el bug del "botón de archivar no funciona después de un clic".
-    // Escucha clics en el *cuerpo de la tabla* del CRM.
+    // --- Delegación de Eventos para botones de la tabla CRM ---
     crmTBody.addEventListener('click', (e) => {
         const target = e.target;
         
         // 1. Clic en el botón de Archivar
-        // Busca el botón '.archive-btn' más cercano al elemento clickeado
         const archiveButton = target.closest('.archive-btn');
         if (archiveButton && userRole === 'admin') {
-            e.preventDefault(); // Evita cualquier acción por defecto
-            rowIdToAction = archiveButton.dataset.rowId; // Obtiene el ID del botón
+            e.preventDefault(); 
+            rowIdToAction = archiveButton.dataset.rowId; // Guarda el ID
             confirmModal.show(); // Muestra el modal
-            return; // Detiene la ejecución
+            return; 
         }
     });
 
@@ -157,21 +178,19 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // --- Configurar Permisos ---
     function setupPermissions() {
-        // Oculta las pestañas que no son para el rol
         if (userRole === "oficina") {
             reportesTab?.classList.add("d-none");
             document.getElementById("pills-reportes")?.remove();
-            archivadosTab?.classList.add("d-none"); // NUEVO
-            document.getElementById("pills-archivados")?.remove(); // NUEVO
+            archivadosTab?.classList.add("d-none"); 
+            document.getElementById("pills-archivados")?.remove(); 
             document.getElementById("type-chart")?.parentElement?.parentElement.classList.add("d-none");
         } else if (userRole === "tecnico") {
             contactosTab?.classList.add("d-none");
             document.getElementById("pills-contactos")?.remove();
-            archivadosTab?.classList.add("d-none"); // NUEVO
-            document.getElementById("pills-archivados")?.remove(); // NUEVO
+            archivadosTab?.classList.add("d-none"); 
+            document.getElementById("pills-archivados")?.remove(); 
             document.getElementById("type-chart")?.parentElement?.parentElement.classList.add("d-none");
         }
-        // Si es admin, no se oculta nada.
     }
 
     // --- 1. Buscar Datos en Google Sheet ---
@@ -190,23 +209,21 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch(SCRIPT_URL + "?action=getData&rol=" + userRole)
             .then(response => {
                 if (!response.ok) {
-                    // Si la respuesta no es 200 (OK), es un error
-                    throw new Error(`Respuesta de red no fue exitosa: ${response.statusText}`);
+                    throw new Error(`Error de red: ${response.statusText}`);
                 }
-                return response.json(); // Intenta convertir la respuesta a JSON
+                return response.json(); 
             })
             .then(res => {
                 if (res.status === "success") {
-                    // Carga todos los datos en la caché global
                     globalDataCache.crm = (res.data.crm || []).map(row => ({...row, Fecha: new Date(row.Fecha)}));
                     globalDataCache.contactos = (res.data.contactos || []).map(row => ({...row, Fecha: new Date(row.Fecha)}));
                     globalDataCache.reportes = (res.data.reportes || []).map(row => ({...row, Fecha: new Date(row.Fecha)}));
-                    globalDataCache.archivados = (res.data.archivados || []).map(row => ({...row, Fecha: new Date(row.Fecha)})); // NUEVO
+                    globalDataCache.archivados = (res.data.archivados || []).map(row => ({...row, Fecha: new Date(row.Fecha)})); 
                     
                     if (applyTodayFilter) {
-                        applyDateFilter('today'); // Aplica filtro "Hoy"
+                        applyDateFilter('today'); 
                     } else {
-                        renderAll(globalDataCache); // Renderiza con filtros actuales
+                        renderAll(globalDataCache); 
                     }
                     
                     if (isSilent(applyTodayFilter)) {
@@ -216,14 +233,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         dashboardContent.classList.remove("d-none");
                     }
                 } else { 
-                    // Si el JSON tiene status: "error"
-                    throw new Error(res.message || "Error desconocido del script"); 
+                    throw new Error(res.message || "Error del script"); 
                 }
             })
             .catch(error => {
                 console.error("Error en fetchData:", error);
                 loadingSpinner.classList.add("d-none");
-                // Muestra el error que viste (si es un error de JSON) o el error de red
                 if (error.message.includes("valid JSON")) {
                     showMessage("Error: El script devolvió HTML. Asegúrate de que la URL es correcta y la implementación tiene permisos para 'Cualquier persona'.", "error");
                 } else {
@@ -279,27 +294,23 @@ document.addEventListener("DOMContentLoaded", () => {
         renderAll(globalDataCache); 
     }
 
-    // Filtra los datos de la caché
     function getFilteredData() {
         const { dateRange } = currentFilters;
         let filteredCRM = globalDataCache.crm;
         let filteredContactos = globalDataCache.contactos;
         let filteredReportes = globalDataCache.reportes;
-        let filteredArchivados = globalDataCache.archivados; // NUEVO
+        let filteredArchivados = globalDataCache.archivados; 
 
-        // Filtra por rango de fecha
         if (dateRange) {
             filteredCRM = filteredCRM.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
             filteredContactos = filteredContactos.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
             filteredReportes = filteredReportes.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
-            filteredArchivados = filteredArchivados.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end); // NUEVO
+            filteredArchivados = filteredArchivados.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end); 
         }
 
-        // Devuelve los datos pre-filtrados por fecha
-        return { crm: filteredCRM, contactos: filteredContactos, reportes: filteredReportes, archivados: filteredArchivados }; // NUEVO
+        return { crm: filteredCRM, contactos: filteredContactos, reportes: filteredReportes, archivados: filteredArchivados }; 
     }
 
-    // Actualiza el botón de filtro de fecha activo
     function updateActiveButton(activeButton) {
         filterBtnGroup.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
         if (activeButton) {
@@ -317,22 +328,20 @@ document.addEventListener("DOMContentLoaded", () => {
     
     function renderAll(fullDataCache) {
         const data = getFilteredData(); 
-        renderAllTables(data); // Dibuja las tablas
-        renderCharts(data.crm); // Dibuja los gráficos (basados solo en CRM)
+        renderAllTables(data); 
+        renderCharts(data.crm); 
     }
     
-    // Dibuja el contenido de TODAS las tablas
     function renderAllTables(data) {
         
-        // Actualiza los valores de búsqueda
         currentFilters.searchCRM = searchCRM?.value || "";
         currentFilters.searchContactos = searchContactos?.value || "";
         currentFilters.searchReportes = searchReportes?.value || "";
-        currentFilters.searchArchivados = searchArchivados?.value || ""; // NUEVO
+        currentFilters.searchArchivados = searchArchivados?.value || ""; 
 
         // Llenar Tabla CRM
         if (crmTBody) {
-            crmTBody.innerHTML = ""; // Limpiar
+            crmTBody.innerHTML = ""; 
             const filteredData = data.crm.filter(row => 
                 Object.values(row).some(val => String(val).toLowerCase().includes(currentFilters.searchCRM))
             );
@@ -364,7 +373,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const select = tr.querySelector(".status-select");
                 updateSelectColor(select);
                 if (!isSelectDisabled) {
-                    // Se agrega el listener de 'change' aquí, porque 'select' es un elemento nuevo
                     select.addEventListener("change", (e) => updateStatus(e.target));
                 }
                 crmTBody.appendChild(tr);
@@ -413,9 +421,9 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // Llenar Tabla Archivados (NUEVO)
+        // Llenar Tabla Archivados
         if (archivadosTBody && userRole === 'admin') {
-            archivadosTBody.innerHTML = ""; // Limpiar
+            archivadosTBody.innerHTML = ""; 
             const filteredData = data.archivados.filter(row => 
                 Object.values(row).some(val => String(val).toLowerCase().includes(currentFilters.searchArchivados))
             );
@@ -435,16 +443,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 archivadosTBody.appendChild(tr);
             });
         }
-
-        // [BUG FIX] Ya no se asignan listeners de 'archivar' aquí.
-        // Se manejan por delegación de eventos al inicio.
     }
     
     // --- 4. Renderizar Gráficos ---
     function renderCharts(crmData) {
-        if (!statusChartCtx) return; // Si el canvas no existe, no hace nada
+        if (!statusChartCtx) return; 
 
-        // Gráfico de Estados
         const statusCounts = { 'Sin contactar': 0, 'En proceso': 0, 'Contactado': 0 };
         crmData.forEach(row => {
             if (statusCounts.hasOwnProperty(row.Estado)) {
@@ -452,7 +456,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        if (statusChartInstance) statusChartInstance.destroy(); // Destruye el gráfico viejo
+        if (statusChartInstance) statusChartInstance.destroy();
         statusChartInstance = new Chart(statusChartCtx, {
             type: 'doughnut',
             data: {
@@ -466,7 +470,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Gráfico de Tipos (Solo Admin)
         if (userRole === 'admin' && typeChartCtx) {
             const typeCounts = { 'Solicitud de Contacto': 0, 'Reporte de Avería': 0 };
             crmData.forEach(row => {
@@ -497,7 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const rowId = selectElement.dataset.rowId;
         const userWhoUpdated = sessionStorage.getItem("userName"); 
         
-        updateSelectColor(selectElement); // Cambia el color del select
+        updateSelectColor(selectElement); 
         showMessage("Guardando cambio...", "info");
 
         const fetchURL = `${SCRIPT_URL}?action=updateStatus&rol=${userRole}&rowId=${rowId}&newStatus=${newStatus}&user=${encodeURIComponent(userWhoUpdated)}`;
@@ -508,15 +511,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (res.status === "success") {
                     showMessage("¡Estado actualizado con éxito!", "success");
                     const fila = selectElement.closest('tr');
-                    fila.cells[5].textContent = userWhoUpdated; // Actualiza la celda "Gestionado por"
+                    fila.cells[5].textContent = userWhoUpdated; 
                     
-                    // Actualiza la caché para que los gráficos se recarguen
                     const rowInCache = globalDataCache.crm.find(row => row.ID == rowId);
                     if (rowInCache) {
                         rowInCache.Estado = newStatus;
                         rowInCache['Gestionado por'] = userWhoUpdated;
                     }
-                    renderCharts(getFilteredData().crm); // Vuelve a dibujar los gráficos
+                    renderCharts(getFilteredData().crm); 
                 } else {
                     throw new Error(res.message);
                 }
@@ -525,20 +527,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- 6. Archivar Fila ---
+    // --- [CORRECCIÓN] Esta función ahora DEVUELVE la promesa de fetch ---
     function executeArchiveRow(rowId) {
         showMessage("Archivando solicitud...", "info");
         
-        fetch(SCRIPT_URL + `?action=archiveRow&rol=${userRole}&rowId=${rowId}`)
+        // Devuelve la promesa para que el listener del modal pueda manejarla
+        return fetch(SCRIPT_URL + `?action=archiveRow&rol=${userRole}&rowId=${rowId}`)
             .then(response => response.json())
             .then(res => {
                 if (res.status === "success") {
                     showMessage("¡Solicitud archivada con éxito!", "success");
                     fetchData(false); // Recarga COMPLETA para actualizar todo
+                    // La promesa se resuelve aquí (éxito)
                 } else {
-                    throw new Error(res.message);
+                    throw new Error(res.message); // Esto será un rechazo
                 }
             })
-            .catch(error => showMessage(`Error al archivar: ${error.message}`, "error"));
+            .catch(error => {
+                showMessage(`Error al archivar: ${error.message}`, "error");
+                // Importante: Vuelve a lanzar el error para que el .catch() 
+                // del listener del modal lo reciba
+                throw error; 
+            });
     }
 
     // --- 7. Exportar a CSV ---
@@ -558,16 +568,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         data.forEach(row => {
             const values = headers.map(header => {
-                // Maneja valores nulos o indefinidos, y convierte todo a string
                 let cell = row[header] === null || row[header] === undefined ? '' : String(row[header]);
-                cell = cell.replace(/"/g, '""'); // Escapa comillas dobles
-                if (cell.includes(",")) cell = `"${cell}"`; // Pone comillas si hay comas
+                cell = cell.replace(/"/g, '""'); 
+                if (cell.includes(",")) cell = `"${cell}"`; 
                 return cell;
             });
             csvContent += values.join(",") + "\n";
         });
 
-        // Crear y descargar el archivo
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -579,9 +587,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // --- Funciones Utilitarias (color y mensajes) ---
     
-    // Cambia el color del <select> según su valor
     function updateSelectColor(select) {
-        // Usa las clases de tu CSS
         select.classList.remove("status-sin-contactar", "status-en-proceso", "status-contactado");
         if (select.value === "Sin contactar") {
             select.classList.add("status-sin-contactar");
@@ -592,12 +598,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     
-    // Muestra mensajes de estado (éxito, error, info)
     function showMessage(message, type) {
         crmMessage.textContent = message;
-        crmMessage.className = ""; // Limpia clases anteriores
+        crmMessage.className = ""; 
         
-        // Asigna la clase de Bootstrap Alert correcta
         if(type === 'success') crmMessage.className = "alert alert-success";
         else if(type === 'error') crmMessage.className = "alert alert-danger";
         else if(type === 'info') crmMessage.className = "alert alert-info";
@@ -606,6 +610,8 @@ document.addEventListener("DOMContentLoaded", () => {
         else if(type === 'info-silent') crmMessage.className = "alert alert-info p-2 small";
         
         // Borra el mensaje después de 4 segundos
-        setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, 4000);
+        // PERO si es un error, déjalo por más tiempo (8 segundos)
+        const duration = type === 'error' ? 8000 : 4000;
+        setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, duration);
     }
 });

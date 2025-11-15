@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- URL de tu script "Todo en Uno" ---
+    // He pegado la URL que me diste.
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     const loginForm = document.getElementById("login-form");
@@ -35,24 +36,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 .then(data => {
                     if (data.status === "success") {
                         loginMessage.textContent = "Acceso concedido. Redirigiendo...";
-                        loginMessage.classList.add("success");
+                        // Usa la clase de tu CSS
+                        loginMessage.classList.add("success"); 
                         
-                        // Guardamos el ROL y el NOMBRE
+                        // --- ¡CORRECCIÓN IMPORTANTE! ---
+                        // Guardamos el ROL y el NOMBRE que devuelve el script
                         sessionStorage.setItem("userRole", data.rol);
-                        sessionStorage.setItem("userName", user); 
+                        sessionStorage.setItem("userName", data.name); // Usamos data.name
                         
                         setTimeout(() => {
                             window.location.href = "crm-dashboard.html";
                         }, 1000);
 
                     } else {
-                        throw new Error(data.message || "Error desconocido");
+                        throw new Error(data.message || "Usuario o contraseña incorrectos");
                     }
                 })
                 .catch(error => {
                     console.error("Error en el login:", error);
                     loginMessage.textContent = `Error: ${error.message}`;
-                    loginMessage.classList.add("error");
+                    // Usa la clase de tu CSS
+                    loginMessage.classList.add("error"); 
                     loginButton.disabled = false;
                     loginButton.innerHTML = 'Ingresar';
                 });

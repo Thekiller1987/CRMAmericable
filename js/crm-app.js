@@ -1,8 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // --- URL de tu script "Todo en Uno" ---
-    // ¡¡¡ RECUERDA PEGAR TU NUEVA URL DE IMPLEMENTACIÓN AQUÍ !!!
-    const SCRIPT_URL = "PEGAR_LA_NUEVA_URL_DE_IMPLEMENTACION_AQUI";
+    // He pegado la URL que me diste.
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     // --- Auth Guard ---
     const userRole = sessionStorage.getItem("userRole");
@@ -188,7 +188,13 @@ document.addEventListener("DOMContentLoaded", () => {
         crmMessage.className = "";
 
         fetch(SCRIPT_URL + "?action=getData&rol=" + userRole)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    // Si la respuesta no es 200 (OK), es un error
+                    throw new Error(`Respuesta de red no fue exitosa: ${response.statusText}`);
+                }
+                return response.json(); // Intenta convertir la respuesta a JSON
+            })
             .then(res => {
                 if (res.status === "success") {
                     // Carga todos los datos en la caché global
@@ -209,12 +215,20 @@ document.addEventListener("DOMContentLoaded", () => {
                         loadingSpinner.classList.add("d-none");
                         dashboardContent.classList.remove("d-none");
                     }
-                } else { throw new Error(res.message); }
+                } else { 
+                    // Si el JSON tiene status: "error"
+                    throw new Error(res.message || "Error desconocido del script"); 
+                }
             })
             .catch(error => {
-                console.error("Error al cargar datos:", error);
+                console.error("Error en fetchData:", error);
                 loadingSpinner.classList.add("d-none");
-                showMessage(`Error al cargar datos: ${error.message}. Asegúrate de que la URL del script sea correcta.`, "error");
+                // Muestra el error que viste (si es un error de JSON) o el error de red
+                if (error.message.includes("valid JSON")) {
+                    showMessage("Error: El script devolvió HTML. Asegúrate de que la URL es correcta y la implementación tiene permisos para 'Cualquier persona'.", "error");
+                } else {
+                    showMessage(`Error al cargar datos: ${error.message}`, "error");
+                }
             });
     }
 
@@ -320,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (crmTBody) {
             crmTBody.innerHTML = ""; // Limpiar
             const filteredData = data.crm.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchCRM))
+                Object.values(row).some(val => String(val).toLowerCase().includes(currentFilters.searchCRM))
             );
             
             filteredData.forEach(row => {
@@ -361,7 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (contactosTBody) {
             contactosTBody.innerHTML = ""; 
             const filteredData = data.contactos.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchContactos))
+                Object.values(row).some(val => String(val).toLowerCase().includes(currentFilters.searchContactos))
             );
             
             filteredData.forEach(row => {
@@ -382,7 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (reportesTBody) {
             reportesTBody.innerHTML = "";
             const filteredData = data.reportes.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchReportes))
+                Object.values(row).some(val => String(val).toLowerCase().includes(currentFilters.searchReportes))
             );
             
             filteredData.forEach(row => {
@@ -403,7 +417,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (archivadosTBody && userRole === 'admin') {
             archivadosTBody.innerHTML = ""; // Limpiar
             const filteredData = data.archivados.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchArchivados))
+                Object.values(row).some(val => String(val).toLowerCase().includes(currentFilters.searchArchivados))
             );
             
             filteredData.forEach(row => {

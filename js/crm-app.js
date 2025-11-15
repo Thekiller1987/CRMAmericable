@@ -3,16 +3,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- URL de tu script "Todo en Uno" ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
-    // --- Auth Guard (Protección de la página) ---
+    // --- Auth Guard ---
     const userRole = sessionStorage.getItem("userRole");
     const userName = sessionStorage.getItem("userName");
-
     if (!userRole) {
-        window.location.href = "index.html"; // Redirige al login si no hay sesión
+        window.location.href = "index.html"; 
         return;
     }
 
-    // --- Elementos del DOM (Navegación) ---
+    // --- Elementos del DOM ---
     const userNameDisplay = document.getElementById("user-name");
     const logoutButton = document.getElementById("logout-button");
     const reloadButton = document.getElementById("reload-button");
@@ -31,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const contactosTBody = document.getElementById("contactos-table-body");
     const reportesTBody = document.getElementById("reportes-table-body");
 
-    // --- Elementos de Filtro ---
+    // Filtros de Fecha
     const filterTodayBtn = document.getElementById("filter-today");
     const filterWeekBtn = document.getElementById("filter-week");
     const filterMonthBtn = document.getElementById("filter-month");
@@ -62,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Estado de Filtros
     let currentFilters = {
-        dateRange: null, // { start, end }
+        dateRange: null,
         searchCRM: "",
         searchContactos: "",
         searchReportes: ""
@@ -84,23 +83,23 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "index.html";
     });
     
-    reloadButton.addEventListener("click", () => fetchData(false)); // Recarga manual
+    reloadButton.addEventListener("click", () => fetchData(false)); 
 
     // Listeners de Búsqueda
     searchCRM.addEventListener("keyup", () => {
         currentFilters.searchCRM = searchCRM.value.toLowerCase();
-        renderAllTables(globalDataCache); // Re-renderizar solo tablas
+        renderAllTables(getFilteredData()); // Llama a la función correcta
     });
     searchContactos.addEventListener("keyup", () => {
         currentFilters.searchContactos = searchContactos.value.toLowerCase();
-        renderAllTables(globalDataCache);
+        renderAllTables(getFilteredData());
     });
     searchReportes.addEventListener("keyup", () => {
         currentFilters.searchReportes = searchReportes.value.toLowerCase();
-        renderAllTables(globalDataCache);
+        renderAllTables(getFilteredData());
     });
     
-    // Listeners de Exportar (Ahora usan los datos filtrados)
+    // Listeners de Exportar
     exportCRM.addEventListener("click", () => exportToCSV(getFilteredData().crm, "reporte_crm.csv"));
     exportContactos.addEventListener("click", () => exportToCSV(getFilteredData().contactos, "reporte_contactos.csv"));
     exportReportes.addEventListener("click", () => exportToCSV(getFilteredData().reportes, "reporte_averias.csv"));
@@ -142,8 +141,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 1. Buscar Datos en Google Sheet ---
     function fetchData(applyTodayFilter = false) {
-        // Carga silenciosa (auto-refresh) vs Carga normal (spinner)
-        if (applyTodayFilter) {
+        if (applyTodayFilter && dashboardContent.classList.contains('d-none')) {
+            // Si es la carga inicial, no es silenciosa
+            applyTodayFilter = false;
+        }
+
+        if (isSilent(applyTodayFilter)) {
             showMessage("Actualizando datos...", "info-silent");
         } else {
             loadingSpinner.classList.remove("d-none");
@@ -157,18 +160,17 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(response => response.json())
             .then(res => {
                 if (res.status === "success") {
-                    // Convertir todas las fechas a objetos Date al recibirlas
                     globalDataCache.crm = res.data.crm.map(row => ({...row, Fecha: new Date(row.Fecha)}));
                     globalDataCache.contactos = res.data.contactos.map(row => ({...row, Fecha: new Date(row.Fecha)}));
                     globalDataCache.reportes = res.data.reportes.map(row => ({...row, Fecha: new Date(row.Fecha)}));
                     
                     if (applyTodayFilter) {
-                        applyDateFilter('today'); // Aplicar filtro "Hoy" por defecto
+                        applyDateFilter('today'); 
                     } else {
-                        renderAll(globalDataCache); // Renderizar todo con filtros actuales
+                        renderAll(globalDataCache); 
                     }
                     
-                    if (applyTodayFilter) {
+                    if (isSilent(applyTodayFilter)) {
                          showMessage("Datos actualizados.", "success-silent");
                     } else {
                         loadingSpinner.classList.add("d-none");
@@ -183,14 +185,18 @@ document.addEventListener("DOMContentLoaded", () => {
             });
     }
 
-    // --- 2. Lógica de Filtros (El Cerebro) ---
+    function isSilent(applyTodayFilter) {
+        // Es silenciosa si NO es la carga inicial (applyTodayFilter=false)
+        return !applyTodayFilter;
+    }
+
+    // --- 2. Lógica de Filtros ---
     
     function applyDateFilter(type) {
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Inicio del día
-
+        today.setHours(0, 0, 0, 0); 
         const endOfToday = new Date();
-        endOfToday.setHours(23, 59, 59, 999); // Fin del día
+        endOfToday.setHours(23, 59, 59, 999); 
 
         if (type === 'today') {
             currentFilters.dateRange = { start: today, end: endOfToday };
@@ -213,49 +219,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("Por favor selecciona una fecha de inicio y una de fin.");
                 return;
             }
-            const start = new Date(dateStartInput.value + 'T00:00:00'); // Corregir zona horaria
-            const end = new Date(dateEndInput.value + 'T23:59:59'); // Corregir zona horaria
+            const start = new Date(dateStartInput.value + 'T00:00:00'); 
+            const end = new Date(dateEndInput.value + 'T23:59:59'); 
             currentFilters.dateRange = { start, end };
-            updateActiveButton(null); // Ningún botón rápido está activo
+            updateActiveButton(null); 
         } else if (type === 'all') {
-            currentFilters.dateRange = null; // Limpiar filtro
+            currentFilters.dateRange = null; 
             dateStartInput.value = "";
             dateEndInput.value = "";
             updateActiveButton(null);
         }
         
-        renderAll(globalDataCache); // Re-renderizar todo con los nuevos filtros
+        renderAll(globalDataCache); 
     }
 
     function getFilteredData() {
-        const { dateRange, searchCRM, searchContactos, searchReportes } = currentFilters;
-
-        // 1. Filtrar por Fecha
+        const { dateRange } = currentFilters;
+        // Aplicar filtros de rol primero
         let filteredCRM = globalDataCache.crm;
         let filteredContactos = globalDataCache.contactos;
         let filteredReportes = globalDataCache.reportes;
 
+        // Aplicar filtros de fecha
         if (dateRange) {
-            filteredCRM = globalDataCache.crm.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
-            filteredContactos = globalDataCache.contactos.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
-            filteredReportes = globalDataCache.reportes.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
-        }
-        
-        // 2. Filtrar por Búsqueda (Se aplica sobre los datos ya filtrados por fecha)
-        if (searchCRM) {
-            filteredCRM = filteredCRM.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(searchCRM))
-            );
-        }
-        if (searchContactos) {
-            filteredContactos = filteredContactos.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(searchContactos))
-            );
-        }
-        if (searchReportes) {
-            filteredReportes = filteredReportes.filter(row => 
-                Object.values(row).some(val => val.toString().toLowerCase().includes(searchReportes))
-            );
+            filteredCRM = filteredCRM.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
+            filteredContactos = filteredContactos.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
+            filteredReportes = filteredReportes.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
         }
 
         return { crm: filteredCRM, contactos: filteredContactos, reportes: filteredReportes };
@@ -266,7 +255,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (activeButton) {
             activeButton.classList.add('active');
         }
-        // Si no hay botón activo (rango o limpiar), limpiar las fechas
         if(!activeButton) {
             if (currentFilters.dateRange === null) {
                 dateStartInput.value = "";
@@ -278,63 +266,69 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- 3. Renderizado "Maestro" ---
     
     function renderAll(fullDataCache) {
-        const data = getFilteredData(); // Obtener solo los datos filtrados
+        const data = getFilteredData(); 
         renderAllTables(data);
-        renderCharts(data.crm); // Los gráficos SÍ se basan en los filtros
+        renderCharts(data.crm); 
     }
     
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // ¡¡AQUÍ ESTÁ LA CORRECCIÓN IMPORTANTE!!
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     function renderAllTables(data) {
-        crmTBody.innerHTML = "";
-        if (contactosTBody) contactosTBody.innerHTML = "";
-        if (reportesTBody) reportesTBody.innerHTML = "";
+        
+        // Restaurar búsquedas primero
+        currentFilters.searchCRM = searchCRM?.value || "";
+        currentFilters.searchContactos = searchContactos?.value || "";
+        currentFilters.searchReportes = searchReportes?.value || "";
 
         // Llenar Tabla CRM
-        data.crm.forEach(row => {
-            const tr = document.createElement("tr");
-            const fecha = new Date(row.Fecha).toLocaleString('es-NI', { dateStyle: 'short', timeStyle: 'short' });
-            const isSelectDisabled = userRole === 'tecnico' && row['Tipo de Solicitud'] !== 'Reporte de Avería';
-
-            tr.innerHTML = `
-                <td>${fecha}</td>
-                <td>${row.Nombre}</td>
-                <td>${row.Telefono}</td>
-                <td>${row['Tipo de Solicitud']}</td>
-                <td>
-                    <select class="form-select form-select-sm status-select" data-row-id="${row.ID}" ${isSelectDisabled ? 'disabled' : ''}>
-                        <option value="Sin contactar" ${row.Estado === 'Sin contactar' ? 'selected' : ''}>Sin contactar</option>
-                        <option value="En proceso" ${row.Estado === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                        <option value="Contactado" ${row.Estado === 'Contactado' ? 'selected' : ''}>Contactado</option>
-                    </select>
-                </td>
-                <td>${row['Gestionado por'] || '---'}</td>
-                <td class="text-end">
-                    ${userRole === 'admin' ? 
-                    `<button class="btn btn-sm btn-warning archive-btn text-dark" data-row-id="${row.ID}" title="Archivar">
-                        <i class="bi bi-archive-fill"></i>
-                     </button>` : '---'}
-                </td>
-            `;
+        if (crmTBody) {
+            crmTBody.innerHTML = ""; // Limpiar
+            const filteredData = data.crm.filter(row => 
+                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchCRM))
+            );
             
-            const select = tr.querySelector(".status-select");
-            updateSelectColor(select);
-            if (!isSelectDisabled) {
-                select.addEventListener("change", (e) => updateStatus(e.target));
-            }
-            crmTBody.appendChild(tr);
-        });
-        
-        if (userRole === 'admin') {
-            document.querySelectorAll('.archive-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    rowIdToAction = e.currentTarget.dataset.rowId; 
-                    confirmModal.show(); 
-                });
+            filteredData.forEach(row => {
+                const tr = document.createElement("tr");
+                const fecha = new Date(row.Fecha).toLocaleString('es-NI', { dateStyle: 'short', timeStyle: 'short' });
+                const isSelectDisabled = userRole === 'tecnico' && row['Tipo de Solicitud'] !== 'Reporte de Avería';
+                tr.innerHTML = `
+                    <td>${fecha}</td>
+                    <td>${row.Nombre}</td>
+                    <td>${row.Telefono}</td>
+                    <td>${row['Tipo de Solicitud']}</td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-row-id="${row.ID}" ${isSelectDisabled ? 'disabled' : ''}>
+                            <option value="Sin contactar" ${row.Estado === 'Sin contactar' ? 'selected' : ''}>Sin contactar</option>
+                            <option value="En proceso" ${row.Estado === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                            <option value="Contactado" ${row.Estado === 'Contactado' ? 'selected' : ''}>Contactado</option>
+                        </select>
+                    </td>
+                    <td>${row['Gestionado por'] || '---'}</td>
+                    <td class="text-end">
+                        ${userRole === 'admin' ? 
+                        `<button class="btn btn-sm btn-warning archive-btn text-dark" data-row-id="${row.ID}" title="Archivar">
+                            <i class="bi bi-archive-fill"></i>
+                         </button>` : '---'}
+                    </td>
+                `;
+                const select = tr.querySelector(".status-select");
+                updateSelectColor(select);
+                if (!isSelectDisabled) {
+                    select.addEventListener("change", (e) => updateStatus(e.target));
+                }
+                crmTBody.appendChild(tr);
             });
         }
         
         // Llenar Tabla Contactos
-        if (data.contactos && contactosTBody) {
-            data.contactos.forEach(row => {
+        if (contactosTBody) {
+            contactosTBody.innerHTML = ""; // Limpiar
+            const filteredData = data.contactos.filter(row => 
+                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchContactos))
+            );
+            
+            filteredData.forEach(row => {
                 const tr = document.createElement("tr");
                 const fecha = new Date(row.Fecha).toLocaleString('es-NI', { dateStyle: 'short' });
                 tr.innerHTML = `
@@ -349,8 +343,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         // Llenar Tabla Reportes
-        if (data.reportes && reportesTBody) {
-             data.reportes.forEach(row => {
+        if (reportesTBody) {
+            reportesTBody.innerHTML = ""; // Limpiar
+            const filteredData = data.reportes.filter(row => 
+                Object.values(row).some(val => val.toString().toLowerCase().includes(currentFilters.searchReportes))
+            );
+            
+            filteredData.forEach(row => {
                 const tr = document.createElement("tr");
                 const fecha = new Date(row.Fecha).toLocaleString('es-NI', { dateStyle: 'short' });
                 tr.innerHTML = `
@@ -364,10 +363,15 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // Restaurar búsquedas después de re-renderizar
-        searchCRM.value = currentFilters.searchCRM;
-        searchContactos.value = currentFilters.searchContactos;
-        searchReportes.value = currentFilters.searchReportes;
+        // Asignar listeners de archivar (solo admin)
+        if (userRole === 'admin') {
+            document.querySelectorAll('.archive-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    rowIdToAction = e.currentTarget.dataset.rowId; 
+                    confirmModal.show(); 
+                });
+            });
+        }
     }
     
     // --- 4. Renderizar Gráficos ---
@@ -466,14 +470,12 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(error => showMessage(`Error al archivar: ${error.message}`, "error"));
     }
 
-    // --- 7. Filtrar Tabla (Lógica de Búsqueda en vivo) ---
+    // --- 7. Filtrar Tabla (Lógica de Búsqueda) ---
     function filterTable(searchInput, tableBody) {
-        if (!tableBody) return;
-        // La búsqueda ahora está integrada en getFilteredData()
-        // Esta función solo necesita disparar el re-renderizado.
-        // Pero el listener de keyup ya lo hace, así que podemos refactorizar.
-        // Por ahora, lo dejamos para que la lógica de renderAllTables funcione.
-        currentFilters[searchInput.id.replace('search-','search')] = searchInput.value.toLowerCase();
+        // La lógica de filtrado ahora se maneja en getFilteredData y renderAllTables
+        // Esta función ahora solo actualiza el estado del filtro y re-renderiza
+        const filterKey = `search${searchInput.id.split('-')[1].charAt(0).toUpperCase() + searchInput.id.split('-')[1].slice(1)}`;
+        currentFilters[filterKey] = searchInput.value.toLowerCase();
         renderAllTables(getFilteredData());
     }
 
@@ -490,8 +492,8 @@ document.addEventListener("DOMContentLoaded", () => {
         data.forEach(row => {
             const values = headers.map(header => {
                 let cell = row[header] ? row[header].toString() : '';
-                cell = cell.replace(/"/g, '""'); // Escapar comillas dobles
-                if (cell.includes(",")) cell = `"${cell}"`; // Poner comillas si hay comas
+                cell = cell.replace(/"/g, '""'); 
+                if (cell.includes(",")) cell = `"${cell}"`; 
                 return cell;
             });
             csvContent += values.join(",") + "\n";
@@ -516,7 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     function showMessage(message, type) {
         crmMessage.textContent = message;
-        crmMessage.className = ""; // Limpiar clases
+        crmMessage.className = ""; 
         
         if(type === 'success') crmMessage.className = "alert alert-success";
         else if(type === 'error') crmMessage.className = "alert alert-danger";

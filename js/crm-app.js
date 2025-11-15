@@ -17,9 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const logoutButton = document.getElementById("logout-button");
     const reloadButton = document.getElementById("reload-button");
     const loadingSpinner = document.getElementById("loading-spinner");
-    const dashboardContent = document.getElementById("dashboard-content");
     const crmMessage = document.getElementById("crm-message");
-    
+    const dashboardContent = document.getElementById("dashboard-content"); // Añadido para mostrar/ocultar
+
     // Pestañas
     const statsTab = document.getElementById("stats-tab-button");
     const crmTab = document.getElementById("crm-tab-button");
@@ -50,6 +50,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Caché de datos
     let globalDataCache = {};
 
+    // --- Elementos del Modal de Confirmación (¡NUEVO!) ---
+    const confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+    let rowIdToDelete = null; // Para guardar el ID de la fila a eliminar
+    
     // --- Inicialización ---
     userNameDisplay.textContent = userName;
     setupPermissions();
@@ -61,20 +66,26 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "index.html";
     });
     
-    // El botón de recarga manual ahora hace una carga "no silenciosa"
     reloadButton.addEventListener("click", () => fetchData(false)); 
 
-    // Listeners de Búsqueda
     searchCRM.addEventListener("keyup", () => filterTable(searchCRM, crmTBody));
     searchContactos.addEventListener("keyup", () => filterTable(searchContactos, contactosTBody));
     searchReportes.addEventListener("keyup", () => filterTable(searchReportes, reportesTBody));
     
-    // Listeners de Exportar
     exportCRM.addEventListener("click", () => exportToCSV(globalDataCache.crm, "reporte_crm.csv"));
     exportContactos.addEventListener("click", () => exportToCSV(globalDataCache.contactos, "reporte_contactos.csv"));
     exportReportes.addEventListener("click", () => exportToCSV(globalDataCache.reportes, "reporte_averias.csv"));
 
-    // --- NUEVO: Auto-Recarga cada 2 minutos (120000 ms) ---
+    // Listener para el botón de confirmar eliminación en el modal (¡NUEVO!)
+    confirmDeleteButton.addEventListener('click', () => {
+        if (rowIdToDelete) {
+            executeDeleteRow(rowIdToDelete);
+            rowIdToDelete = null; // Limpiar después de usar
+        }
+        confirmDeleteModal.hide(); // Ocultar el modal
+    });
+
+    // --- Auto-Recarga cada 2 minutos (120000 ms) ---
     setInterval(() => {
         fetchData(true); // Carga silenciosa
     }, 120000);
@@ -82,16 +93,16 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // --- Configurar Permisos (Ocultar/Mostrar Pestañas) ---
     function setupPermissions() {
-        if (userRole === "admin") {
-            // Admin ve todo
-        } else if (userRole === "oficina") {
+        // La lógica de eliminación de elementos del DOM ahora se hace aquí
+        // para que las referencias a elementos ocultos no causen errores.
+        if (userRole === "oficina") {
             reportesTab?.classList.add("d-none");
             document.getElementById("pills-reportes")?.remove();
-            document.getElementById("type-chart")?.parentElement.parentElement.classList.add("d-none");
+            document.getElementById("type-chart")?.parentElement?.parentElement.classList.add("d-none");
         } else if (userRole === "tecnico") {
             contactosTab?.classList.add("d-none");
             document.getElementById("pills-contactos")?.remove();
-            document.getElementById("type-chart")?.parentElement.parentElement.classList.add("d-none");
+            document.getElementById("type-chart")?.parentElement?.parentElement.classList.add("d-none");
         }
     }
 
@@ -99,10 +110,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function fetchData(isSilent = false) {
         
         if (isSilent) {
-            // Carga silenciosa: solo muestra un mensaje pequeño
             showMessage("Actualizando datos en segundo plano...", "info-silent");
         } else {
-            // Carga normal: muestra el spinner grande
             loadingSpinner.classList.remove("d-none");
             dashboardContent.classList.add("d-none");
             crmMessage.textContent = "";
@@ -142,9 +151,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- 2. Pintar los Datos en las Tablas ---
     function renderData(data) {
         // Guardar la búsqueda y scroll actual
-        const crmSearch = searchCRM.value;
-        const contactosSearch = searchContactos.value;
-        const reportesSearch = searchReportes.value;
+        const crmSearch = searchCRM?.value || "";
+        const contactosSearch = searchContactos?.value || "";
+        const reportesSearch = searchReportes?.value || "";
 
         crmTBody.innerHTML = "";
         if (contactosTBody) contactosTBody.innerHTML = "";
@@ -155,13 +164,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const tr = document.createElement("tr");
             const fecha = new Date(row.Fecha).toLocaleString('es-NI', { dateStyle: 'short', timeStyle: 'short' });
             
+            // Determinar si el select de estado debe estar deshabilitado
+            const isSelectDisabled = userRole === 'tecnico' && row['Tipo de Solicitud'] !== 'Reporte de Avería';
+
             tr.innerHTML = `
                 <td>${fecha}</td>
                 <td>${row.Nombre}</td>
                 <td>${row.Telefono}</td>
                 <td>${row['Tipo de Solicitud']}</td>
                 <td>
-                    <select class="form-select form-select-sm status-select" data-row-id="${row.ID}">
+                    <select class="form-select form-select-sm status-select" 
+                            data-row-id="${row.ID}"
+                            ${isSelectDisabled ? 'disabled' : ''}>
                         <option value="Sin contactar" ${row.Estado === 'Sin contactar' ? 'selected' : ''}>Sin contactar</option>
                         <option value="En proceso" ${row.Estado === 'En proceso' ? 'selected' : ''}>En proceso</option>
                         <option value="Contactado" ${row.Estado === 'Contactado' ? 'selected' : ''}>Contactado</option>
@@ -178,13 +192,19 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const select = tr.querySelector(".status-select");
             updateSelectColor(select);
-            select.addEventListener("change", (e) => updateStatus(e.target));
+            // Solo añadir listener si el select no está deshabilitado
+            if (!isSelectDisabled) {
+                select.addEventListener("change", (e) => updateStatus(e.target));
+            }
             crmTBody.appendChild(tr);
         });
         
         if (userRole === 'admin') {
             document.querySelectorAll('.delete-btn').forEach(button => {
-                button.addEventListener('click', (e) => deleteRow(e.currentTarget));
+                button.addEventListener('click', (e) => {
+                    rowIdToDelete = e.currentTarget.dataset.rowId; // Guarda el ID
+                    confirmDeleteModal.show(); // Muestra el modal
+                });
             });
         }
         
@@ -221,17 +241,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Restaurar la búsqueda
-        searchCRM.value = crmSearch;
-        searchContactos.value = contactosSearch;
-        searchReportes.value = reportesSearch;
-        filterTable(searchCRM, crmTBody);
-        filterTable(searchContactos, contactosTBody);
-        filterTable(searchReportes, reportesTBody);
+        if (searchCRM) { searchCRM.value = crmSearch; filterTable(searchCRM, crmTBody); }
+        if (searchContactos) { searchContactos.value = contactosSearch; filterTable(searchContactos, contactosTBody); }
+        if (searchReportes) { searchReportes.value = reportesSearch; filterTable(searchReportes, reportesTBody); }
     }
     
     // --- 3. Renderizar Gráficos ---
     function renderCharts(crmData) {
-        if (!crmData || !statusChartCtx) return; // Salir si no hay datos o no existe el canvas
+        // Asegúrate de que los contextos existen antes de intentar crear gráficos
+        if (!statusChartCtx) return; 
 
         // Gráfico 1: Conteo por Estado
         const statusCounts = { 'Sin contactar': 0, 'En proceso': 0, 'Contactado': 0 };
@@ -294,6 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     showMessage("¡Estado actualizado con éxito!", "success");
                     const fila = selectElement.closest('tr');
                     fila.cells[5].textContent = userWhoUpdated;
+                    fetchData(true); // Recarga silenciosa para actualizar gráficos si el estado cambió
                 } else {
                     throw new Error(res.message);
                 }
@@ -301,12 +320,13 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(error => showMessage(`Error al guardar: ${error.message}`, "error"));
     }
 
-    // --- 5. Eliminar Fila ---
-    function deleteRow(buttonElement) {
-        const rowId = buttonElement.dataset.rowId;
-        
-        if (!confirm("¿Estás seguro de que quieres eliminar esta solicitud?")) return;
-
+    // --- 5. Eliminar Fila (AHORA SOLO MUESTRA EL MODAL) ---
+    // La lógica de eliminación real está en executeDeleteRow
+    // Esta función solo se encarga de mostrar el modal y preparar el ID
+    // function deleteRow(buttonElement) ya no se usa directamente
+    
+    // --- NUEVA FUNCIÓN: Ejecutar la Eliminación Real ---
+    function executeDeleteRow(rowId) {
         showMessage("Eliminando fila...", "info");
         
         fetch(SCRIPT_URL + `?action=deleteRow&rol=${userRole}&rowId=${rowId}`)
@@ -324,7 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 6. Filtrar Tabla ---
     function filterTable(searchInput, tableBody) {
-        if (!tableBody) return; // No hacer nada si la tabla no existe (ej: técnico en pestaña de contactos)
+        if (!tableBody) return;
         const searchTerm = searchInput.value.toLowerCase();
         const rows = tableBody.getElementsByTagName("tr");
 
@@ -374,7 +394,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function showMessage(message, type) {
         crmMessage.textContent = message;
         
-        // Quitar clases anteriores
         crmMessage.classList.remove("alert-success", "alert-danger", "alert-info", "alert", "p-2", "small");
 
         if(type === 'success') {
@@ -391,7 +410,6 @@ document.addEventListener("DOMContentLoaded", () => {
             crmMessage.className = "alert alert-info p-2 small";
         }
         
-        // Los mensajes "silenciosos" o de éxito/error normales desaparecen
         setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, 4000);
     }
 });

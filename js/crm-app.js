@@ -12,14 +12,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    // --- Elementos del DOM ---
+    // --- Elementos del DOM (Navegación) ---
     const userNameDisplay = document.getElementById("user-name");
     const logoutButton = document.getElementById("logout-button");
     const reloadButton = document.getElementById("reload-button");
     const loadingSpinner = document.getElementById("loading-spinner");
     const crmMessage = document.getElementById("crm-message");
     const dashboardContent = document.getElementById("dashboard-content");
-
+    
     // Pestañas
     const statsTab = document.getElementById("stats-tab-button");
     const crmTab = document.getElementById("crm-tab-button");
@@ -30,6 +30,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const crmTBody = document.getElementById("crm-table-body");
     const contactosTBody = document.getElementById("contactos-table-body");
     const reportesTBody = document.getElementById("reportes-table-body");
+
+    // --- Elementos de Filtro ---
+    const filterTodayBtn = document.getElementById("filter-today");
+    const filterWeekBtn = document.getElementById("filter-week");
+    const filterMonthBtn = document.getElementById("filter-month");
+    const dateStartInput = document.getElementById("date-start");
+    const dateEndInput = document.getElementById("date-end");
+    const filterRangeBtn = document.getElementById("filter-range-btn");
+    const filterClearBtn = document.getElementById("filter-clear-btn");
+    const filterBtnGroup = document.querySelector(".btn-group");
 
     // Barras de Búsqueda
     const searchCRM = document.getElementById("search-crm");
@@ -48,17 +58,25 @@ document.addEventListener("DOMContentLoaded", () => {
     let typeChartInstance = null;
     
     // Caché de datos
-    let globalDataCache = {};
+    let globalDataCache = { crm: [], contactos: [], reportes: [] };
+    
+    // Estado de Filtros
+    let currentFilters = {
+        dateRange: null, // { start, end }
+        searchCRM: "",
+        searchContactos: "",
+        searchReportes: ""
+    };
 
-    // --- Elementos del Modal de Confirmación (¡ESTA ES LA PARTE NUEVA!) ---
-    const confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-    const confirmDeleteButton = document.getElementById('confirmDeleteButton');
-    let rowIdToDelete = null; 
+    // Modal de Confirmación
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    const confirmActionButton = document.getElementById('confirmActionButton');
+    let rowIdToAction = null; 
     
     // --- Inicialización ---
     userNameDisplay.textContent = userName;
     setupPermissions();
-    fetchData(false); // Carga inicial
+    fetchData(true); // Carga inicial y aplica filtro "Hoy" por defecto
 
     // --- Event Listeners ---
     logoutButton.addEventListener("click", () => {
@@ -66,23 +84,41 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "index.html";
     });
     
-    reloadButton.addEventListener("click", () => fetchData(false)); 
+    reloadButton.addEventListener("click", () => fetchData(false)); // Recarga manual
 
-    searchCRM.addEventListener("keyup", () => filterTable(searchCRM, crmTBody));
-    searchContactos.addEventListener("keyup", () => filterTable(searchContactos, contactosTBody));
-    searchReportes.addEventListener("keyup", () => filterTable(searchReportes, reportesTBody));
+    // Listeners de Búsqueda
+    searchCRM.addEventListener("keyup", () => {
+        currentFilters.searchCRM = searchCRM.value.toLowerCase();
+        renderAllTables(globalDataCache); // Re-renderizar solo tablas
+    });
+    searchContactos.addEventListener("keyup", () => {
+        currentFilters.searchContactos = searchContactos.value.toLowerCase();
+        renderAllTables(globalDataCache);
+    });
+    searchReportes.addEventListener("keyup", () => {
+        currentFilters.searchReportes = searchReportes.value.toLowerCase();
+        renderAllTables(globalDataCache);
+    });
     
-    exportCRM.addEventListener("click", () => exportToCSV(globalDataCache.crm, "reporte_crm.csv"));
-    exportContactos.addEventListener("click", () => exportToCSV(globalDataCache.contactos, "reporte_contactos.csv"));
-    exportReportes.addEventListener("click", () => exportToCSV(globalDataCache.reportes, "reporte_averias.csv"));
+    // Listeners de Exportar (Ahora usan los datos filtrados)
+    exportCRM.addEventListener("click", () => exportToCSV(getFilteredData().crm, "reporte_crm.csv"));
+    exportContactos.addEventListener("click", () => exportToCSV(getFilteredData().contactos, "reporte_contactos.csv"));
+    exportReportes.addEventListener("click", () => exportToCSV(getFilteredData().reportes, "reporte_averias.csv"));
 
-    // Listener para el botón de confirmar eliminación en el modal
-    confirmDeleteButton.addEventListener('click', () => {
-        if (rowIdToDelete) {
-            executeDeleteRow(rowIdToDelete);
-            rowIdToDelete = null; // Limpiar después de usar
+    // Listeners de Filtros de Fecha
+    filterTodayBtn.addEventListener("click", () => applyDateFilter('today'));
+    filterWeekBtn.addEventListener("click", () => applyDateFilter('week'));
+    filterMonthBtn.addEventListener("click", () => applyDateFilter('month'));
+    filterRangeBtn.addEventListener("click", () => applyDateFilter('range'));
+    filterClearBtn.addEventListener("click", () => applyDateFilter('all'));
+
+    // Listener del Modal
+    confirmActionButton.addEventListener('click', () => {
+        if (rowIdToAction) {
+            executeArchiveRow(rowIdToAction);
+            rowIdToAction = null;
         }
-        confirmDeleteModal.hide(); // Ocultar el modal
+        confirmModal.hide();
     });
 
     // --- Auto-Recarga cada 2 minutos ---
@@ -105,22 +141,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- 1. Buscar Datos en Google Sheet ---
-    function fetchData(isSilent = false) {
-        if (!isSilent) {
+    function fetchData(applyTodayFilter = false) {
+        // Carga silenciosa (auto-refresh) vs Carga normal (spinner)
+        if (applyTodayFilter) {
+            showMessage("Actualizando datos...", "info-silent");
+        } else {
             loadingSpinner.classList.remove("d-none");
             dashboardContent.classList.add("d-none");
-            crmMessage.textContent = "";
-            crmMessage.className = "";
         }
+        
+        crmMessage.textContent = "";
+        crmMessage.className = "";
 
         fetch(SCRIPT_URL + "?action=getData&rol=" + userRole)
             .then(response => response.json())
             .then(res => {
                 if (res.status === "success") {
-                    globalDataCache = res.data; 
-                    renderData(res.data);
-                    renderCharts(res.data.crm);
-                    if (!isSilent) {
+                    // Convertir todas las fechas a objetos Date al recibirlas
+                    globalDataCache.crm = res.data.crm.map(row => ({...row, Fecha: new Date(row.Fecha)}));
+                    globalDataCache.contactos = res.data.contactos.map(row => ({...row, Fecha: new Date(row.Fecha)}));
+                    globalDataCache.reportes = res.data.reportes.map(row => ({...row, Fecha: new Date(row.Fecha)}));
+                    
+                    if (applyTodayFilter) {
+                        applyDateFilter('today'); // Aplicar filtro "Hoy" por defecto
+                    } else {
+                        renderAll(globalDataCache); // Renderizar todo con filtros actuales
+                    }
+                    
+                    if (applyTodayFilter) {
+                         showMessage("Datos actualizados.", "success-silent");
+                    } else {
                         loadingSpinner.classList.add("d-none");
                         dashboardContent.classList.remove("d-none");
                     }
@@ -128,20 +178,112 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .catch(error => {
                 console.error("Error al cargar datos:", error);
-                if (!isSilent) {
-                    loadingSpinner.classList.add("d-none");
-                    crmMessage.textContent = `Error al cargar datos: ${error.message}`;
-                    crmMessage.classList.add("error", "alert", "alert-danger");
-                }
+                loadingSpinner.classList.add("d-none");
+                showMessage(`Error al cargar datos: ${error.message}`, "error");
             });
     }
 
-    // --- 2. Pintar los Datos en las Tablas ---
-    function renderData(data) {
-        const crmSearch = searchCRM?.value || "";
-        const contactosSearch = searchContactos?.value || "";
-        const reportesSearch = searchReportes?.value || "";
+    // --- 2. Lógica de Filtros (El Cerebro) ---
+    
+    function applyDateFilter(type) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Inicio del día
 
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999); // Fin del día
+
+        if (type === 'today') {
+            currentFilters.dateRange = { start: today, end: endOfToday };
+            updateActiveButton(filterTodayBtn);
+        } else if (type === 'week') {
+            const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+            const lastDayOfWeek = new Date(firstDayOfWeek);
+            lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
+            lastDayOfWeek.setHours(23, 59, 59, 999);
+            currentFilters.dateRange = { start: firstDayOfWeek, end: lastDayOfWeek };
+            updateActiveButton(filterWeekBtn);
+        } else if (type === 'month') {
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            lastDayOfMonth.setHours(23, 59, 59, 999);
+            currentFilters.dateRange = { start: firstDayOfMonth, end: lastDayOfMonth };
+            updateActiveButton(filterMonthBtn);
+        } else if (type === 'range') {
+            if (!dateStartInput.value || !dateEndInput.value) {
+                alert("Por favor selecciona una fecha de inicio y una de fin.");
+                return;
+            }
+            const start = new Date(dateStartInput.value + 'T00:00:00'); // Corregir zona horaria
+            const end = new Date(dateEndInput.value + 'T23:59:59'); // Corregir zona horaria
+            currentFilters.dateRange = { start, end };
+            updateActiveButton(null); // Ningún botón rápido está activo
+        } else if (type === 'all') {
+            currentFilters.dateRange = null; // Limpiar filtro
+            dateStartInput.value = "";
+            dateEndInput.value = "";
+            updateActiveButton(null);
+        }
+        
+        renderAll(globalDataCache); // Re-renderizar todo con los nuevos filtros
+    }
+
+    function getFilteredData() {
+        const { dateRange, searchCRM, searchContactos, searchReportes } = currentFilters;
+
+        // 1. Filtrar por Fecha
+        let filteredCRM = globalDataCache.crm;
+        let filteredContactos = globalDataCache.contactos;
+        let filteredReportes = globalDataCache.reportes;
+
+        if (dateRange) {
+            filteredCRM = globalDataCache.crm.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
+            filteredContactos = globalDataCache.contactos.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
+            filteredReportes = globalDataCache.reportes.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
+        }
+        
+        // 2. Filtrar por Búsqueda (Se aplica sobre los datos ya filtrados por fecha)
+        if (searchCRM) {
+            filteredCRM = filteredCRM.filter(row => 
+                Object.values(row).some(val => val.toString().toLowerCase().includes(searchCRM))
+            );
+        }
+        if (searchContactos) {
+            filteredContactos = filteredContactos.filter(row => 
+                Object.values(row).some(val => val.toString().toLowerCase().includes(searchContactos))
+            );
+        }
+        if (searchReportes) {
+            filteredReportes = filteredReportes.filter(row => 
+                Object.values(row).some(val => val.toString().toLowerCase().includes(searchReportes))
+            );
+        }
+
+        return { crm: filteredCRM, contactos: filteredContactos, reportes: filteredReportes };
+    }
+
+    function updateActiveButton(activeButton) {
+        filterBtnGroup.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+        // Si no hay botón activo (rango o limpiar), limpiar las fechas
+        if(!activeButton) {
+            if (currentFilters.dateRange === null) {
+                dateStartInput.value = "";
+                dateEndInput.value = "";
+            }
+        }
+    }
+
+    // --- 3. Renderizado "Maestro" ---
+    
+    function renderAll(fullDataCache) {
+        const data = getFilteredData(); // Obtener solo los datos filtrados
+        renderAllTables(data);
+        renderCharts(data.crm); // Los gráficos SÍ se basan en los filtros
+    }
+    
+    function renderAllTables(data) {
         crmTBody.innerHTML = "";
         if (contactosTBody) contactosTBody.innerHTML = "";
         if (reportesTBody) reportesTBody.innerHTML = "";
@@ -167,8 +309,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td>${row['Gestionado por'] || '---'}</td>
                 <td class="text-end">
                     ${userRole === 'admin' ? 
-                    `<button class="btn btn-sm btn-danger delete-btn" data-row-id="${row.ID}" title="Eliminar">
-                        <i class="bi bi-trash-fill"></i>
+                    `<button class="btn btn-sm btn-warning archive-btn text-dark" data-row-id="${row.ID}" title="Archivar">
+                        <i class="bi bi-archive-fill"></i>
                      </button>` : '---'}
                 </td>
             `;
@@ -181,15 +323,11 @@ document.addEventListener("DOMContentLoaded", () => {
             crmTBody.appendChild(tr);
         });
         
-        // ¡ESTA ES LA PARTE IMPORTANTE!
-        // Añadir listeners a los botones de eliminar (solo admin)
         if (userRole === 'admin') {
-            document.querySelectorAll('.delete-btn').forEach(button => {
+            document.querySelectorAll('.archive-btn').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    // 1. Guardar el ID de la fila a eliminar
-                    rowIdToDelete = e.currentTarget.dataset.rowId; 
-                    // 2. Mostrar el modal profesional
-                    confirmDeleteModal.show(); 
+                    rowIdToAction = e.currentTarget.dataset.rowId; 
+                    confirmModal.show(); 
                 });
             });
         }
@@ -226,13 +364,13 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // Restaurar la búsqueda
-        if (searchCRM) { searchCRM.value = crmSearch; filterTable(searchCRM, crmTBody); }
-        if (searchContactos) { searchContactos.value = contactosSearch; filterTable(searchContactos, contactosTBody); }
-        if (searchReportes) { searchReportes.value = reportesSearch; filterTable(searchReportes, reportesTBody); }
+        // Restaurar búsquedas después de re-renderizar
+        searchCRM.value = currentFilters.searchCRM;
+        searchContactos.value = currentFilters.searchContactos;
+        searchReportes.value = currentFilters.searchReportes;
     }
     
-    // --- 3. Renderizar Gráficos ---
+    // --- 4. Renderizar Gráficos ---
     function renderCharts(crmData) {
         if (!statusChartCtx) return; 
 
@@ -279,7 +417,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     
-    // --- 4. Actualizar Estado ---
+    // --- 5. Actualizar Estado ---
     function updateStatus(selectElement) {
         const newStatus = selectElement.value;
         const rowId = selectElement.dataset.rowId;
@@ -297,7 +435,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     showMessage("¡Estado actualizado con éxito!", "success");
                     const fila = selectElement.closest('tr');
                     fila.cells[5].textContent = userWhoUpdated;
-                    fetchData(true); 
+                    // Actualizar caché y re-renderizar gráficos
+                    const rowInCache = globalDataCache.crm.find(row => row.ID === rowId);
+                    if (rowInCache) {
+                        rowInCache.Estado = newStatus;
+                        rowInCache['Gestionado por'] = userWhoUpdated;
+                    }
+                    renderCharts(getFilteredData().crm);
                 } else {
                     throw new Error(res.message);
                 }
@@ -305,35 +449,35 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(error => showMessage(`Error al guardar: ${error.message}`, "error"));
     }
 
-    // --- 5. Ejecutar la Eliminación Real ---
-    function executeDeleteRow(rowId) {
-        showMessage("Eliminando fila...", "info");
+    // --- 6. Archivar Fila ---
+    function executeArchiveRow(rowId) {
+        showMessage("Archivando solicitud...", "info");
         
-        fetch(SCRIPT_URL + `?action=deleteRow&rol=${userRole}&rowId=${rowId}`)
+        fetch(SCRIPT_URL + `?action=archiveRow&rol=${userRole}&rowId=${rowId}`)
             .then(response => response.json())
             .then(res => {
                 if (res.status === "success") {
-                    showMessage("¡Solicitud eliminada!", "success");
-                    fetchData(true); // Recarga silenciosa
+                    showMessage("¡Solicitud archivada con éxito!", "success");
+                    fetchData(false); // Recarga COMPLETA para actualizar todo
                 } else {
                     throw new Error(res.message);
                 }
             })
-            .catch(error => showMessage(`Error al eliminar: ${error.message}`, "error"));
+            .catch(error => showMessage(`Error al archivar: ${error.message}`, "error"));
     }
 
-    // --- 6. Filtrar Tabla ---
+    // --- 7. Filtrar Tabla (Lógica de Búsqueda en vivo) ---
     function filterTable(searchInput, tableBody) {
         if (!tableBody) return;
-        const searchTerm = searchInput.value.toLowerCase();
-        const rows = tableBody.getElementsByTagName("tr");
-
-        for (const row of rows) {
-            row.style.display = row.textContent.toLowerCase().includes(searchTerm) ? "" : "none";
-        }
+        // La búsqueda ahora está integrada en getFilteredData()
+        // Esta función solo necesita disparar el re-renderizado.
+        // Pero el listener de keyup ya lo hace, así que podemos refactorizar.
+        // Por ahora, lo dejamos para que la lógica de renderAllTables funcione.
+        currentFilters[searchInput.id.replace('search-','search')] = searchInput.value.toLowerCase();
+        renderAllTables(getFilteredData());
     }
 
-    // --- 7. Exportar a CSV ---
+    // --- 8. Exportar a CSV ---
     function exportToCSV(data, filename) {
         if (!data || data.length === 0) {
             alert("No hay datos para exportar.");
@@ -346,8 +490,8 @@ document.addEventListener("DOMContentLoaded", () => {
         data.forEach(row => {
             const values = headers.map(header => {
                 let cell = row[header] ? row[header].toString() : '';
-                cell = cell.replace(/"/g, '""');
-                if (cell.includes(",")) cell = `"${cell}"`;
+                cell = cell.replace(/"/g, '""'); // Escapar comillas dobles
+                if (cell.includes(",")) cell = `"${cell}"`; // Poner comillas si hay comas
                 return cell;
             });
             csvContent += values.join(",") + "\n";
@@ -362,7 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.removeChild(link);
     }
     
-    // --- Función utilitaria para colorear los <select> ---
+    // --- Funciones Utilitarias (color y mensajes) ---
     function updateSelectColor(select) {
         select.classList.remove("status-sin-contactar", "status-en-proceso", "status-contactado");
         if (select.value === "Sin contactar") select.classList.add("status-sin-contactar");
@@ -370,12 +514,10 @@ document.addEventListener("DOMContentLoaded", () => {
         else select.classList.add("status-contactado");
     }
     
-    // --- Función utilitaria para mostrar mensajes ---
     function showMessage(message, type) {
         crmMessage.textContent = message;
+        crmMessage.className = ""; // Limpiar clases
         
-        crmMessage.classList.remove("alert-success", "alert-danger", "alert-info", "alert", "p-2", "small");
-
         if(type === 'success') crmMessage.className = "alert alert-success";
         else if(type === 'error') crmMessage.className = "alert alert-danger";
         else if(type === 'info') crmMessage.className = "alert alert-info";

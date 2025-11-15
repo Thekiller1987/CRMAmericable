@@ -13,6 +13,10 @@ body {
     font-family: var(--brand-font);
 }
 
+
+.btn-warning {
+    color: #000 !important;
+}
 /* --- ESTILOS DEL LOGIN --- */
 .crm-body {
     display: flex;
@@ -123,5 +127,12 @@ body {
 #login-message.success,
 #crm-message.success {
     color: #198754;
+    font-weight: bold;
+}
+
+/* --- ESTILOS PARA LA BARRA DE FILTROS --- */
+.btn-group .btn.active {
+    background-color: var(--brand-blue);
+    color: white;
     font-weight: bold;
 }

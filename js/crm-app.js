@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const userName = sessionStorage.getItem("userName");
 
     if (!userRole) {
-        window.location.href = "crm-login.html";
+        window.location.href = "index.html";
         return;
     }
 

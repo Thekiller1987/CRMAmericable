@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Inicialización ---
     userNameDisplay.textContent = userName;
     setupPermissions();
-    fetchData();
+    fetchData(false); // Carga inicial (no silenciosa)
 
     // --- Event Listeners ---
     logoutButton.addEventListener("click", () => {
@@ -61,7 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "index.html";
     });
     
-    reloadButton.addEventListener("click", fetchData);
+    // El botón de recarga manual ahora hace una carga "no silenciosa"
+    reloadButton.addEventListener("click", () => fetchData(false)); 
 
     // Listeners de Búsqueda
     searchCRM.addEventListener("keyup", () => filterTable(searchCRM, crmTBody));
@@ -73,6 +74,11 @@ document.addEventListener("DOMContentLoaded", () => {
     exportContactos.addEventListener("click", () => exportToCSV(globalDataCache.contactos, "reporte_contactos.csv"));
     exportReportes.addEventListener("click", () => exportToCSV(globalDataCache.reportes, "reporte_averias.csv"));
 
+    // --- NUEVO: Auto-Recarga cada 2 minutos (120000 ms) ---
+    setInterval(() => {
+        fetchData(true); // Carga silenciosa
+    }, 120000);
+    
     
     // --- Configurar Permisos (Ocultar/Mostrar Pestañas) ---
     function setupPermissions() {
@@ -80,21 +86,28 @@ document.addEventListener("DOMContentLoaded", () => {
             // Admin ve todo
         } else if (userRole === "oficina") {
             reportesTab?.classList.add("d-none");
-            document.getElementById("pills-reportes").remove(); // Elimina la pestaña
-            document.getElementById("type-chart").parentElement.parentElement.classList.add("d-none"); // Oculta gráfico de tipos
+            document.getElementById("pills-reportes")?.remove();
+            document.getElementById("type-chart")?.parentElement.parentElement.classList.add("d-none");
         } else if (userRole === "tecnico") {
             contactosTab?.classList.add("d-none");
-            document.getElementById("pills-contactos").remove(); // Elimina la pestaña
-            document.getElementById("type-chart").parentElement.parentElement.classList.add("d-none"); // Oculta gráfico de tipos
+            document.getElementById("pills-contactos")?.remove();
+            document.getElementById("type-chart")?.parentElement.parentElement.classList.add("d-none");
         }
     }
 
-    // --- 1. Buscar Datos en Google Sheet ---
-    function fetchData() {
-        loadingSpinner.classList.remove("d-none");
-        dashboardContent.classList.add("d-none");
-        crmMessage.textContent = "";
-        crmMessage.className = "";
+    // --- 1. Buscar Datos en Google Sheet (MODIFICADA) ---
+    function fetchData(isSilent = false) {
+        
+        if (isSilent) {
+            // Carga silenciosa: solo muestra un mensaje pequeño
+            showMessage("Actualizando datos en segundo plano...", "info-silent");
+        } else {
+            // Carga normal: muestra el spinner grande
+            loadingSpinner.classList.remove("d-none");
+            dashboardContent.classList.add("d-none");
+            crmMessage.textContent = "";
+            crmMessage.className = "";
+        }
 
         fetch(SCRIPT_URL + "?action=getData&rol=" + userRole)
             .then(response => response.json())
@@ -103,22 +116,36 @@ document.addEventListener("DOMContentLoaded", () => {
                     globalDataCache = res.data; // Guardar datos en caché
                     renderData(res.data);
                     renderCharts(res.data.crm); // Renderizar gráficos
-                    loadingSpinner.classList.add("d-none");
-                    dashboardContent.classList.remove("d-none");
+                    
+                    if (isSilent) {
+                        showMessage("Datos actualizados.", "success-silent");
+                    } else {
+                        loadingSpinner.classList.add("d-none");
+                        dashboardContent.classList.remove("d-none");
+                    }
                 } else {
                     throw new Error(res.message);
                 }
             })
             .catch(error => {
                 console.error("Error al cargar datos:", error);
-                loadingSpinner.classList.add("d-none");
-                crmMessage.textContent = `Error al cargar datos: ${error.message}`;
-                crmMessage.classList.add("error", "alert", "alert-danger");
+                if (isSilent) {
+                    showMessage(`Error al recargar: ${error.message}`, "error-silent");
+                } else {
+                    loadingSpinner.classList.add("d-none");
+                    crmMessage.textContent = `Error al cargar datos: ${error.message}`;
+                    crmMessage.classList.add("error", "alert", "alert-danger");
+                }
             });
     }
 
     // --- 2. Pintar los Datos en las Tablas ---
     function renderData(data) {
+        // Guardar la búsqueda y scroll actual
+        const crmSearch = searchCRM.value;
+        const contactosSearch = searchContactos.value;
+        const reportesSearch = searchReportes.value;
+
         crmTBody.innerHTML = "";
         if (contactosTBody) contactosTBody.innerHTML = "";
         if (reportesTBody) reportesTBody.innerHTML = "";
@@ -161,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
         
-        // Llenar Tabla Contactos (si el rol tiene permiso)
+        // Llenar Tabla Contactos
         if (data.contactos && contactosTBody) {
             data.contactos.forEach(row => {
                 const tr = document.createElement("tr");
@@ -177,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
         
-        // Llenar Tabla Reportes (si el rol tiene permiso)
+        // Llenar Tabla Reportes
         if (data.reportes && reportesTBody) {
              data.reportes.forEach(row => {
                 const tr = document.createElement("tr");
@@ -192,11 +219,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 reportesTBody.appendChild(tr);
             });
         }
+
+        // Restaurar la búsqueda
+        searchCRM.value = crmSearch;
+        searchContactos.value = contactosSearch;
+        searchReportes.value = reportesSearch;
+        filterTable(searchCRM, crmTBody);
+        filterTable(searchContactos, contactosTBody);
+        filterTable(searchReportes, reportesTBody);
     }
     
     // --- 3. Renderizar Gráficos ---
     function renderCharts(crmData) {
-        if (!crmData || crmData.length === 0) return; // No hay datos para graficar
+        if (!crmData || !statusChartCtx) return; // Salir si no hay datos o no existe el canvas
 
         // Gráfico 1: Conteo por Estado
         const statusCounts = { 'Sin contactar': 0, 'En proceso': 0, 'Contactado': 0 };
@@ -204,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
             statusCounts[row.Estado]++;
         });
 
-        if (statusChartInstance) statusChartInstance.destroy(); // Destruir gráfico anterior
+        if (statusChartInstance) statusChartInstance.destroy();
         statusChartInstance = new Chart(statusChartCtx, {
             type: 'doughnut',
             data: {
@@ -225,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 typeCounts[row['Tipo de Solicitud']]++;
             });
 
-            if (typeChartInstance) typeChartInstance.destroy(); // Destruir gráfico anterior
+            if (typeChartInstance) typeChartInstance.destroy();
             typeChartInstance = new Chart(typeChartCtx, {
                 type: 'bar',
                 data: {
@@ -236,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         backgroundColor: [ '#005cbf', '#198754' ]
                     }]
                 },
-                options: { scales: { y: { beginAtZero: true } } }
+                options: { scales: { y: { beginAtZero: true, stepSize: 1 } } }
             });
         }
     }
@@ -279,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(res => {
                 if (res.status === "success") {
                     showMessage("¡Solicitud eliminada!", "success");
-                    fetchData(); // Recargar la tabla
+                    fetchData(true); // Recarga silenciosa
                 } else {
                     throw new Error(res.message);
                 }
@@ -289,6 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 6. Filtrar Tabla ---
     function filterTable(searchInput, tableBody) {
+        if (!tableBody) return; // No hacer nada si la tabla no existe (ej: técnico en pestaña de contactos)
         const searchTerm = searchInput.value.toLowerCase();
         const rows = tableBody.getElementsByTagName("tr");
 
@@ -310,8 +346,8 @@ document.addEventListener("DOMContentLoaded", () => {
         data.forEach(row => {
             const values = headers.map(header => {
                 let cell = row[header] ? row[header].toString() : '';
-                cell = cell.replace(/"/g, '""'); // Escapar comillas dobles
-                if (cell.includes(",")) cell = `"${cell}"`; // Poner comillas si hay comas
+                cell = cell.replace(/"/g, '""');
+                if (cell.includes(",")) cell = `"${cell}"`;
                 return cell;
             });
             csvContent += values.join(",") + "\n";
@@ -337,12 +373,25 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Función utilitaria para mostrar mensajes ---
     function showMessage(message, type) {
         crmMessage.textContent = message;
-        if(type === 'success') crmMessage.className = "alert alert-success";
-        else if(type === 'error') crmMessage.className = "alert alert-danger";
-        else crmMessage.className = "alert alert-info";
         
-        if(type === 'success' || type === 'error') {
-             setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, 4000);
+        // Quitar clases anteriores
+        crmMessage.classList.remove("alert-success", "alert-danger", "alert-info", "alert", "p-2", "small");
+
+        if(type === 'success') {
+            crmMessage.className = "alert alert-success";
+        } else if(type === 'error') {
+            crmMessage.className = "alert alert-danger";
+        } else if(type === 'info') {
+            crmMessage.className = "alert alert-info";
+        } else if(type === 'success-silent') {
+            crmMessage.className = "alert alert-success p-2 small"; // Mensaje sutil
+        } else if(type === 'error-silent') {
+            crmMessage.className = "alert alert-danger p-2 small";
+        } else if(type === 'info-silent') {
+            crmMessage.className = "alert alert-info p-2 small";
         }
+        
+        // Los mensajes "silenciosos" o de éxito/error normales desaparecen
+        setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, 4000);
     }
 });

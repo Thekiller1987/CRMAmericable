@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // --- URL de tu script "Todo en Uno" ---
-    // Esta es la URL que me diste, ¡parece estar funcionando!
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     // --- Auth Guard ---
@@ -125,36 +124,45 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- [CORRECCIÓN DEFINITIVA] ---
     // --- Listener del Botón "Archivar" del Modal ---
     confirmActionButton.addEventListener('click', () => {
-        if (rowIdToAction) {
-            const currentId = rowIdToAction;
-            rowIdToAction = null; // Limpia el ID para evitar doble clic
+        if (!rowIdToAction) return; // Si no hay ID, no hacer nada
 
-            // Muestra un spinner en el botón y lo deshabilita
-            confirmActionButton.disabled = true;
-            confirmActionButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Archivando...';
+        // 1. Mostrar spinner
+        confirmActionButton.disabled = true;
+        confirmActionButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Archivando...';
 
-            executeArchiveRow(currentId)
-                .then(() => {
-                    // Si la promesa se resuelve (éxito), cierra el modal
-                    confirmModal.hide();
-                })
-                .catch(() => {
-                    // Si la promesa se rechaza (error), NO cierra el modal.
-                    // El error ya se mostró en la función executeArchiveRow.
-                    // Esto permite al usuario ver el error.
-                })
-                .finally(() => {
-                    // Se ejecuta siempre (éxito o error)
-                    // Vuelve a habilitar el botón y restaura su texto
-                    confirmActionButton.disabled = false;
-                    confirmActionButton.innerHTML = 'Archivar';
-                });
+        // 2. Construir la URL de la petición
+        const fetchURL = `${SCRIPT_URL}?action=archiveRow&rol=${userRole}&rowId=${rowIdToAction}`;
+        
+        // 3. Limpiar el ID para evitar clics duplicados
+        rowIdToAction = null; 
 
-        } else {
-             // Si no hay ID (caso raro), simplemente cierra el modal
-             confirmModal.hide();
-        }
+        // 4. Ejecutar la petición
+        fetch(fetchURL)
+            .then(response => response.json())
+            .then(res => {
+                if (res.status === "success") {
+                    // ÉXITO
+                    showMessage("¡Solicitud archivada con éxito!", "success");
+                    confirmModal.hide(); // Ocultar el modal
+                    fetchData(false); // Recargar los datos de la tabla
+                } else {
+                    // ERROR (del script)
+                    throw new Error(res.message);
+                }
+            })
+            .catch(error => {
+                // ERROR (de red o del script)
+                // Mostrar el error en la barra de mensajes principal
+                showMessage(`Error al archivar: ${error.message}`, "error");
+                confirmModal.hide(); // Ocultar el modal para que se vea el error
+            })
+            .finally(() => {
+                // 5. Pase lo que pase, restaurar el botón
+                confirmActionButton.disabled = false;
+                confirmActionButton.innerHTML = 'Archivar';
+            });
     });
+
 
     // --- Delegación de Eventos para botones de la tabla CRM ---
     crmTBody.addEventListener('click', (e) => {
@@ -526,32 +534,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(error => showMessage(`Error al guardar: ${error.message}`, "error"));
     }
 
-    // --- 6. Archivar Fila ---
-    // --- [CORRECCIÓN] Esta función ahora DEVUELVE la promesa de fetch ---
-    function executeArchiveRow(rowId) {
-        showMessage("Archivando solicitud...", "info");
-        
-        // Devuelve la promesa para que el listener del modal pueda manejarla
-        return fetch(SCRIPT_URL + `?action=archiveRow&rol=${userRole}&rowId=${rowId}`)
-            .then(response => response.json())
-            .then(res => {
-                if (res.status === "success") {
-                    showMessage("¡Solicitud archivada con éxito!", "success");
-                    fetchData(false); // Recarga COMPLETA para actualizar todo
-                    // La promesa se resuelve aquí (éxito)
-                } else {
-                    throw new Error(res.message); // Esto será un rechazo
-                }
-            })
-            .catch(error => {
-                showMessage(`Error al archivar: ${error.message}`, "error");
-                // Importante: Vuelve a lanzar el error para que el .catch() 
-                // del listener del modal lo reciba
-                throw error; 
-            });
-    }
-
-    // --- 7. Exportar a CSV ---
+    // --- 6. Exportar a CSV ---
     function exportToCSV(data, filename) {
         if (!data || data.length === 0) {
             alert("No hay datos para exportar.");
@@ -609,8 +592,6 @@ document.addEventListener("DOMContentLoaded", () => {
         else if(type === 'error-silent') crmMessage.className = "alert alert-danger p-2 small";
         else if(type === 'info-silent') crmMessage.className = "alert alert-info p-2 small";
         
-        // Borra el mensaje después de 4 segundos
-        // PERO si es un error, déjalo por más tiempo (8 segundos)
         const duration = type === 'error' ? 8000 : 4000;
         setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, duration);
     }

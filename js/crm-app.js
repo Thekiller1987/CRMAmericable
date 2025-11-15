@@ -88,7 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Listeners de Búsqueda
     searchCRM.addEventListener("keyup", () => {
         currentFilters.searchCRM = searchCRM.value.toLowerCase();
-        renderAllTables(getFilteredData()); // Llama a la función correcta
+        renderAllTables(getFilteredData()); 
     });
     searchContactos.addEventListener("keyup", () => {
         currentFilters.searchContactos = searchContactos.value.toLowerCase();
@@ -142,7 +142,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- 1. Buscar Datos en Google Sheet ---
     function fetchData(applyTodayFilter = false) {
         if (applyTodayFilter && dashboardContent.classList.contains('d-none')) {
-            // Si es la carga inicial, no es silenciosa
             applyTodayFilter = false;
         }
 
@@ -186,7 +185,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function isSilent(applyTodayFilter) {
-        // Es silenciosa si NO es la carga inicial (applyTodayFilter=false)
         return !applyTodayFilter;
     }
 
@@ -235,12 +233,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function getFilteredData() {
         const { dateRange } = currentFilters;
-        // Aplicar filtros de rol primero
         let filteredCRM = globalDataCache.crm;
         let filteredContactos = globalDataCache.contactos;
         let filteredReportes = globalDataCache.reportes;
 
-        // Aplicar filtros de fecha
         if (dateRange) {
             filteredCRM = filteredCRM.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
             filteredContactos = filteredContactos.filter(row => row.Fecha >= dateRange.start && row.Fecha <= dateRange.end);
@@ -271,9 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderCharts(data.crm); 
     }
     
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // ¡¡AQUÍ ESTÁ LA CORRECCIÓN IMPORTANTE!!
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // Esta es la función que te daba el error "innerHTML of null"
     function renderAllTables(data) {
         
         // Restaurar búsquedas primero
@@ -378,7 +372,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderCharts(crmData) {
         if (!statusChartCtx) return; 
 
-        // Gráfico 1: Conteo por Estado
         const statusCounts = { 'Sin contactar': 0, 'En proceso': 0, 'Contactado': 0 };
         crmData.forEach(row => {
             statusCounts[row.Estado]++;
@@ -398,7 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Gráfico 2: Conteo por Tipo (Solo para Admin)
         if (userRole === 'admin' && typeChartCtx) {
             const typeCounts = { 'Solicitud de Contacto': 0, 'Reporte de Avería': 0 };
             crmData.forEach(row => {
@@ -485,8 +477,14 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("No hay datos para exportar.");
             return;
         }
+        
+        // Obtener encabezados de la primera fila de datos, si existen
+        const headers = data.length > 0 ? Object.keys(data[0]) : [];
+        if (headers.length === 0) {
+             alert("No hay datos para exportar.");
+            return;
+        }
 
-        const headers = Object.keys(data[0]);
         let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
 
         data.forEach(row => {

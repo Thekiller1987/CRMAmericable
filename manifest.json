@@ -1,0 +1,21 @@
+{
+    "name": "CRM Americable",
+    "short_name": "Americable",
+    "description": "Panel de CRM para Americable",
+    "start_url": "crm-login.html",
+    "display": "standalone",
+    "background_color": "#f4f7f6",
+    "theme_color": "#005cbf",
+    "icons": [
+        {
+            "src": "icons/icon-192x192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "icons/icon-512x512.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ]
+}

@@ -1,0 +1,127 @@
+/* =================================================== */
+/* ESTILO "FULL PROFESIONAL" PARA EL CRM               */
+/* =================================================== */
+
+:root {
+    --brand-blue: #005cbf;
+    --brand-dark: #212529;
+    --brand-light: #f8f9fa;
+    --brand-font: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+    font-family: var(--brand-font);
+}
+
+/* --- ESTILOS DEL LOGIN --- */
+.crm-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f4f7f6;
+    background-image: linear-gradient(170deg, #f4f7f6 0%, #dbe4f0 100%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 2.5rem;
+    background-color: #ffffff;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+.login-logo {
+    height: 70px;
+    max-width: 250px;
+}
+
+.form-floating label {
+    color: #6c757d;
+}
+
+.form-control:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 0.25rem rgba(0, 92, 191, 0.25);
+}
+
+.btn-primary {
+    background-color: var(--brand-blue);
+    border-color: var(--brand-blue);
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #004a9a;
+    border-color: #004a9a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 92, 191, 0.2);
+}
+
+/* --- ESTILOS DEL DASHBOARD --- */
+.dashboard-body {
+    background-color: var(--brand-light);
+}
+
+.dashboard-nav {
+    background-color: var(--brand-dark);
+}
+
+.dashboard-nav .navbar-brand,
+.dashboard-nav .nav-link {
+    color: white !important;
+}
+
+.dashboard-nav .nav-link:hover {
+    color: #ddd !important;
+}
+
+.dashboard-nav .logo-sm {
+    height: 30px;
+    /* Filtro para que el SVG se vea blanco */
+    filter: brightness(0) invert(1);
+}
+
+.table-responsive-lg {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden; /* Para que los bordes redondeados se vean bien */
+}
+
+/* Estilo para los selectores de estado */
+.status-select {
+    font-weight: bold;
+    border: 0;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+.status-select.status-sin-contactar {
+    color: #dc3545;
+    background-color: #f8d7da;
+}
+.status-select.status-en-proceso {
+    color: #ffc107;
+    background-color: #fff3cd;
+}
+.status-select.status-contactado {
+    color: #198754;
+    background-color: #d1e7dd;
+}
+
+/* Mensajes de error/éxito */
+#login-message.error,
+#crm-message.error {
+    color: #dc3545;
+    font-weight: bold;
+}
+#login-message.success,
+#crm-message.success {
+    color: #198754;
+    font-weight: bold;
+}

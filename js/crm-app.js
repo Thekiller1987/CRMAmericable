@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const reloadButton = document.getElementById("reload-button");
     const loadingSpinner = document.getElementById("loading-spinner");
     const crmMessage = document.getElementById("crm-message");
-    const dashboardContent = document.getElementById("dashboard-content"); // Añadido para mostrar/ocultar
+    const dashboardContent = document.getElementById("dashboard-content");
 
     // Pestañas
     const statsTab = document.getElementById("stats-tab-button");
@@ -50,15 +50,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // Caché de datos
     let globalDataCache = {};
 
-    // --- Elementos del Modal de Confirmación (¡NUEVO!) ---
+    // --- Elementos del Modal de Confirmación (¡ESTA ES LA PARTE NUEVA!) ---
     const confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
     const confirmDeleteButton = document.getElementById('confirmDeleteButton');
-    let rowIdToDelete = null; // Para guardar el ID de la fila a eliminar
+    let rowIdToDelete = null; 
     
     // --- Inicialización ---
     userNameDisplay.textContent = userName;
     setupPermissions();
-    fetchData(false); // Carga inicial (no silenciosa)
+    fetchData(false); // Carga inicial
 
     // --- Event Listeners ---
     logoutButton.addEventListener("click", () => {
@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
     exportContactos.addEventListener("click", () => exportToCSV(globalDataCache.contactos, "reporte_contactos.csv"));
     exportReportes.addEventListener("click", () => exportToCSV(globalDataCache.reportes, "reporte_averias.csv"));
 
-    // Listener para el botón de confirmar eliminación en el modal (¡NUEVO!)
+    // Listener para el botón de confirmar eliminación en el modal
     confirmDeleteButton.addEventListener('click', () => {
         if (rowIdToDelete) {
             executeDeleteRow(rowIdToDelete);
@@ -85,16 +85,14 @@ document.addEventListener("DOMContentLoaded", () => {
         confirmDeleteModal.hide(); // Ocultar el modal
     });
 
-    // --- Auto-Recarga cada 2 minutos (120000 ms) ---
+    // --- Auto-Recarga cada 2 minutos ---
     setInterval(() => {
         fetchData(true); // Carga silenciosa
     }, 120000);
     
     
-    // --- Configurar Permisos (Ocultar/Mostrar Pestañas) ---
+    // --- Configurar Permisos ---
     function setupPermissions() {
-        // La lógica de eliminación de elementos del DOM ahora se hace aquí
-        // para que las referencias a elementos ocultos no causen errores.
         if (userRole === "oficina") {
             reportesTab?.classList.add("d-none");
             document.getElementById("pills-reportes")?.remove();
@@ -106,12 +104,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- 1. Buscar Datos en Google Sheet (MODIFICADA) ---
+    // --- 1. Buscar Datos en Google Sheet ---
     function fetchData(isSilent = false) {
-        
-        if (isSilent) {
-            showMessage("Actualizando datos en segundo plano...", "info-silent");
-        } else {
+        if (!isSilent) {
             loadingSpinner.classList.remove("d-none");
             dashboardContent.classList.add("d-none");
             crmMessage.textContent = "";
@@ -122,25 +117,18 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(response => response.json())
             .then(res => {
                 if (res.status === "success") {
-                    globalDataCache = res.data; // Guardar datos en caché
+                    globalDataCache = res.data; 
                     renderData(res.data);
-                    renderCharts(res.data.crm); // Renderizar gráficos
-                    
-                    if (isSilent) {
-                        showMessage("Datos actualizados.", "success-silent");
-                    } else {
+                    renderCharts(res.data.crm);
+                    if (!isSilent) {
                         loadingSpinner.classList.add("d-none");
                         dashboardContent.classList.remove("d-none");
                     }
-                } else {
-                    throw new Error(res.message);
-                }
+                } else { throw new Error(res.message); }
             })
             .catch(error => {
                 console.error("Error al cargar datos:", error);
-                if (isSilent) {
-                    showMessage(`Error al recargar: ${error.message}`, "error-silent");
-                } else {
+                if (!isSilent) {
                     loadingSpinner.classList.add("d-none");
                     crmMessage.textContent = `Error al cargar datos: ${error.message}`;
                     crmMessage.classList.add("error", "alert", "alert-danger");
@@ -150,7 +138,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 2. Pintar los Datos en las Tablas ---
     function renderData(data) {
-        // Guardar la búsqueda y scroll actual
         const crmSearch = searchCRM?.value || "";
         const contactosSearch = searchContactos?.value || "";
         const reportesSearch = searchReportes?.value || "";
@@ -163,8 +150,6 @@ document.addEventListener("DOMContentLoaded", () => {
         data.crm.forEach(row => {
             const tr = document.createElement("tr");
             const fecha = new Date(row.Fecha).toLocaleString('es-NI', { dateStyle: 'short', timeStyle: 'short' });
-            
-            // Determinar si el select de estado debe estar deshabilitado
             const isSelectDisabled = userRole === 'tecnico' && row['Tipo de Solicitud'] !== 'Reporte de Avería';
 
             tr.innerHTML = `
@@ -173,9 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td>${row.Telefono}</td>
                 <td>${row['Tipo de Solicitud']}</td>
                 <td>
-                    <select class="form-select form-select-sm status-select" 
-                            data-row-id="${row.ID}"
-                            ${isSelectDisabled ? 'disabled' : ''}>
+                    <select class="form-select form-select-sm status-select" data-row-id="${row.ID}" ${isSelectDisabled ? 'disabled' : ''}>
                         <option value="Sin contactar" ${row.Estado === 'Sin contactar' ? 'selected' : ''}>Sin contactar</option>
                         <option value="En proceso" ${row.Estado === 'En proceso' ? 'selected' : ''}>En proceso</option>
                         <option value="Contactado" ${row.Estado === 'Contactado' ? 'selected' : ''}>Contactado</option>
@@ -192,18 +175,21 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const select = tr.querySelector(".status-select");
             updateSelectColor(select);
-            // Solo añadir listener si el select no está deshabilitado
             if (!isSelectDisabled) {
                 select.addEventListener("change", (e) => updateStatus(e.target));
             }
             crmTBody.appendChild(tr);
         });
         
+        // ¡ESTA ES LA PARTE IMPORTANTE!
+        // Añadir listeners a los botones de eliminar (solo admin)
         if (userRole === 'admin') {
             document.querySelectorAll('.delete-btn').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    rowIdToDelete = e.currentTarget.dataset.rowId; // Guarda el ID
-                    confirmDeleteModal.show(); // Muestra el modal
+                    // 1. Guardar el ID de la fila a eliminar
+                    rowIdToDelete = e.currentTarget.dataset.rowId; 
+                    // 2. Mostrar el modal profesional
+                    confirmDeleteModal.show(); 
                 });
             });
         }
@@ -248,7 +234,6 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // --- 3. Renderizar Gráficos ---
     function renderCharts(crmData) {
-        // Asegúrate de que los contextos existen antes de intentar crear gráficos
         if (!statusChartCtx) return; 
 
         // Gráfico 1: Conteo por Estado
@@ -312,7 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     showMessage("¡Estado actualizado con éxito!", "success");
                     const fila = selectElement.closest('tr');
                     fila.cells[5].textContent = userWhoUpdated;
-                    fetchData(true); // Recarga silenciosa para actualizar gráficos si el estado cambió
+                    fetchData(true); 
                 } else {
                     throw new Error(res.message);
                 }
@@ -320,12 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(error => showMessage(`Error al guardar: ${error.message}`, "error"));
     }
 
-    // --- 5. Eliminar Fila (AHORA SOLO MUESTRA EL MODAL) ---
-    // La lógica de eliminación real está en executeDeleteRow
-    // Esta función solo se encarga de mostrar el modal y preparar el ID
-    // function deleteRow(buttonElement) ya no se usa directamente
-    
-    // --- NUEVA FUNCIÓN: Ejecutar la Eliminación Real ---
+    // --- 5. Ejecutar la Eliminación Real ---
     function executeDeleteRow(rowId) {
         showMessage("Eliminando fila...", "info");
         
@@ -396,19 +376,12 @@ document.addEventListener("DOMContentLoaded", () => {
         
         crmMessage.classList.remove("alert-success", "alert-danger", "alert-info", "alert", "p-2", "small");
 
-        if(type === 'success') {
-            crmMessage.className = "alert alert-success";
-        } else if(type === 'error') {
-            crmMessage.className = "alert alert-danger";
-        } else if(type === 'info') {
-            crmMessage.className = "alert alert-info";
-        } else if(type === 'success-silent') {
-            crmMessage.className = "alert alert-success p-2 small"; // Mensaje sutil
-        } else if(type === 'error-silent') {
-            crmMessage.className = "alert alert-danger p-2 small";
-        } else if(type === 'info-silent') {
-            crmMessage.className = "alert alert-info p-2 small";
-        }
+        if(type === 'success') crmMessage.className = "alert alert-success";
+        else if(type === 'error') crmMessage.className = "alert alert-danger";
+        else if(type === 'info') crmMessage.className = "alert alert-info";
+        else if(type === 'success-silent') crmMessage.className = "alert alert-success p-2 small";
+        else if(type === 'error-silent') crmMessage.className = "alert alert-danger p-2 small";
+        else if(type === 'info-silent') crmMessage.className = "alert alert-info p-2 small";
         
         setTimeout(() => { crmMessage.textContent = ""; crmMessage.className = ""; }, 4000);
     }

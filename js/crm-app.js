@@ -124,7 +124,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- [CORRECCIÓN DEFINITIVA] ---
     // --- Listener del Botón "Archivar" del Modal ---
     confirmActionButton.addEventListener('click', () => {
-        if (!rowIdToAction) return; // Si no hay ID, no hacer nada
+        if (!rowIdToAction) {
+            console.log("No rowIdToAction, returning");
+            return; // Si no hay ID, no hacer nada
+        }
+
+        console.log("Archive button clicked for ID:", rowIdToAction);
 
         // 1. Mostrar spinner
         confirmActionButton.disabled = true;
@@ -134,12 +139,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const fetchURL = `${SCRIPT_URL}?action=archiveRow&rol=${userRole}&rowId=${rowIdToAction}`;
         
         // 3. Limpiar el ID para evitar clics duplicados
+        const currentIdToArchive = rowIdToAction;
         rowIdToAction = null; 
 
         // 4. Ejecutar la petición
         fetch(fetchURL)
-            .then(response => response.json())
+            .then(response => {
+                console.log("Fetch response received:", response);
+                if (!response.ok) {
+                    throw new Error(`Error de red: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(res => {
+                console.log("Fetch JSON response:", res);
                 if (res.status === "success") {
                     // ÉXITO
                     showMessage("¡Solicitud archivada con éxito!", "success");
@@ -152,14 +165,20 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .catch(error => {
                 // ERROR (de red o del script)
+                console.error("Error during archive fetch:", error);
                 // Mostrar el error en la barra de mensajes principal
                 showMessage(`Error al archivar: ${error.message}`, "error");
                 confirmModal.hide(); // Ocultar el modal para que se vea el error
             })
             .finally(() => {
                 // 5. Pase lo que pase, restaurar el botón
+                console.log("Archive fetch finished, re-enabling button.");
                 confirmActionButton.disabled = false;
                 confirmActionButton.innerHTML = 'Archivar';
+                // Si la acción falló, restauramos el ID para que el usuario pueda reintentar
+                if (rowIdToAction === null) { 
+                    rowIdToAction = currentIdToArchive;
+                }
             });
     });
 
@@ -173,6 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (archiveButton && userRole === 'admin') {
             e.preventDefault(); 
             rowIdToAction = archiveButton.dataset.rowId; // Guarda el ID
+            console.log("Archive button on row clicked, setting rowIdToAction:", rowIdToAction);
             confirmModal.show(); // Muestra el modal
             return; 
         }

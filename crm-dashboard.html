@@ -20,7 +20,7 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark dashboard-nav shadow-sm sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="index.html">
+            <a class="navbar-brand" href="#">
                 <img src="logo.svg" alt="Americable" class="logo-sm">
                 <span class="fw-bold ms-2">CRM Americable</span>
             </a>
@@ -30,7 +30,7 @@
             <div class="collapse navbar-collapse" id="crmNav">
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item">
-                        <button class="btn btn-outline-primary me-3" id="reload-button" title="Recargar Datos">
+                        <button class="btn btn-outline-light me-3" id="reload-button" title="Recargar Datos">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </li>
@@ -108,6 +108,11 @@
                 <li class="nav-item" role="presentation" id="reportes-tab-button">
                     <button class="nav-link" id="pills-reportes-tab" data-bs-toggle="pill" data-bs-target="#pills-reportes" type="button" role="tab">
                         <i class="bi bi-tools me-2"></i>Reportes
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation" id="archivados-tab-button">
+                    <button class="nav-link" id="pills-archivados-tab" data-bs-toggle="pill" data-bs-target="#pills-archivados" type="button" role="tab">
+                        <i class="bi bi-archive-fill me-2"></i>Archivados
                     </button>
                 </li>
             </ul>
@@ -203,6 +208,37 @@
                                         </tr>
                                     </thead>
                                     <tbody id="reportes-table-body">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="pills-archivados" role="tabpanel">
+                     <div class="card shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0">Registros Archivados (Solo Admin)</h5>
+                                <div class="d-flex mt-3 mt-md-0">
+                                    <input type="text" class="form-control me-2" id="search-archivados" placeholder="Buscar por ID, nombre...">
+                                    <button class="btn btn-success" id="export-archivados-button" title="Exportar a CSV"><i class="bi bi-download"></i></button>
+                                </div>
+                            </div>
+                            <div class="table-responsive-lg mt-3">
+                                <table class="table table-striped table-hover align-middle">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Nombre</th>
+                                            <th>Teléfono</th>
+                                            <th>Tipo</th>
+                                            <th>Estado</th>
+                                            <th>Gestionado por</th>
+                                            <th>ID</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="archivados-table-body">
                                         </tbody>
                                 </table>
                             </div>

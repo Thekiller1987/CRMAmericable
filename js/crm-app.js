@@ -1,24 +1,49 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-    // ¡¡¡ PEGA TU NUEVA URL DE APPS SCRIPT AQUÍ !!!
-    const SCRIPT_URL = "PEGAR_LA_NUEVA_URL_DE_IMPLEMENTACION_AQUI";
+    // --- URL de tu script (YA PUESTA CORRECTAMENTE) ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     const userRole = sessionStorage.getItem("userRole");
     const userName = sessionStorage.getItem("userName");
+    
+    // Auth Guard: Si no hay rol, mandar al login
     if (!userRole) { window.location.href = "index.html"; return; }
 
-    // Elementos
+    // Elementos del DOM
     const userNameDisplay = document.getElementById("user-name");
+    const logoutButton = document.getElementById("logout-button");
+    const reloadButton = document.getElementById("reload-button");
     const loadingSpinner = document.getElementById("loading-spinner");
     const crmMessage = document.getElementById("crm-message");
     const dashboardContent = document.getElementById("dashboard-content");
+    
+    // Pestañas
+    const reportesTab = document.getElementById("reportes-tab-button");
+    const archivadosTab = document.getElementById("archivados-tab-button"); 
+    const archivadosTabContent = document.getElementById("pills-archivados");
+
+    // Tablas
     const crmTBody = document.getElementById("crm-table-body");
     const archivadosTBody = document.getElementById("archivados-table-body");
-    const archivadosTabBtn = document.getElementById("archivados-tab-button");
 
-    // Cache y Estado
-    let globalData = { crm: [], archivados: [] };
-    let technicianList = [];
+    // Filtros y Buscador
+    const filterTodayBtn = document.getElementById("filter-today");
+    const filterWeekBtn = document.getElementById("filter-week");
+    const filterAllBtn = document.getElementById("filter-all");
+    const searchCRM = document.getElementById("search-crm");
+    const searchArchivados = document.getElementById("search-archivados");
+    
+    // Botones de Acción
+    const exportCRM = document.getElementById("export-crm-button");
+    const printReportBtn = document.getElementById("print-report-button");
+
+    // Gráficos
+    const statusChartCtx = document.getElementById('status-chart')?.getContext('2d');
+    let statusChartInstance = null;
+    
+    // Datos y Estado
+    let globalData = { crm: [], archivados: [] }; 
+    let technicianList = []; 
     let currentFilterDate = 'today'; // 'today', 'week', 'all'
     let searchText = "";
     let rowIdToAction = null;
@@ -26,131 +51,187 @@ document.addEventListener("DOMContentLoaded", () => {
     // Modal
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
     const confirmBtn = document.getElementById('confirmActionButton');
-
-    // INIT
+    
+    // --- INICIALIZACIÓN ---
     userNameDisplay.textContent = userName;
-    if (userRole !== 'admin') {
-        if(archivadosTabBtn) archivadosTabBtn.classList.add("d-none");
-    }
-
-    // Cargar Técnicos y luego Datos
-    loadTechnicians().then(() => loadData(true));
+    setupPermissions();
+    
+    // 1. Cargar lista de técnicos, luego cargar datos
+    loadTechnicians().then(() => {
+        loadData(true); 
+    });
 
     // --- EVENT LISTENERS ---
-    
-    document.getElementById("logout-button").addEventListener("click", () => {
-        sessionStorage.clear(); window.location.href = "index.html";
+
+    // Logout
+    logoutButton.addEventListener("click", () => {
+        sessionStorage.clear();
+        window.location.href = "index.html";
     });
-    document.getElementById("reload-button").addEventListener("click", () => loadData(false));
+    
+    // Recargar
+    reloadButton.addEventListener("click", () => loadData(false)); 
+
+    // Buscadores
+    searchCRM.addEventListener("keyup", (e) => {
+        searchText = e.target.value.toLowerCase();
+        render(); 
+    });
+
+    if (searchArchivados) {
+        searchArchivados.addEventListener("keyup", (e) => {
+             const term = e.target.value.toLowerCase();
+             renderArchivados(term);
+        });
+    }
+
+    // Botones Exportar / Imprimir
+    if (exportCRM) exportCRM.addEventListener("click", () => exportCSV(getFilteredData(), "Reporte_Diario.csv"));
+    if (printReportBtn) printReportBtn.addEventListener("click", printReport);
 
     // Filtros de Fecha
-    document.getElementById("filter-today").addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate='today'; render(); });
-    document.getElementById("filter-week").addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate='week'; render(); });
-    document.getElementById("filter-all").addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate='all'; render(); });
+    filterTodayBtn.addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate = 'today'; render(); });
+    filterWeekBtn.addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate = 'week'; render(); });
+    filterAllBtn.addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate = 'all'; render(); });
 
-    // Buscador
-    document.getElementById("search-crm").addEventListener("keyup", (e) => {
-        searchText = e.target.value.toLowerCase();
-        render();
+    // Acción del Modal (Archivar)
+    confirmBtn.addEventListener('click', () => {
+        if (!rowIdToAction) return;
+        
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Archivando...';
+
+        fetch(`${SCRIPT_URL}?action=archiveRow&rol=${userRole}&rowId=${rowIdToAction}`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.status === "success") {
+                    msg("¡Caso archivado correctamente!", "success");
+                    confirmModal.hide();
+                    loadData(false); 
+                } else { 
+                    throw new Error(res.message); 
+                }
+            })
+            .catch(error => {
+                msg(`Error: ${error.message}`, "error");
+                confirmModal.hide();
+            })
+            .finally(() => {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = 'Sí, Archivar';
+                rowIdToAction = null;
+            });
     });
 
-    // Botón Imprimir PDF
-    document.getElementById("print-report-button").addEventListener("click", printReport);
-    
-    // Botón Excel
-    document.getElementById("export-crm-button").addEventListener("click", () => exportCSV(getFilteredData(), "Reporte_CRM.csv"));
-
-    // Delegación Tabla (Cambios en Selects y Botón Archivar)
-    crmTBody.addEventListener('change', (e) => {
-        if (e.target.classList.contains('status-select')) updateStatus(e.target);
-        if (e.target.classList.contains('tech-select')) updateTech(e.target);
-    });
-
+    // --- DELEGACIÓN DE EVENTOS EN LA TABLA (Para elementos dinámicos) ---
     crmTBody.addEventListener('click', (e) => {
+        // Detectar clic en botón Archivar
         const btn = e.target.closest('.archive-btn');
         if (btn) {
             rowIdToAction = btn.dataset.rowId;
             confirmModal.show();
         }
     });
-
-    // Acción Modal Archivar
-    confirmBtn.addEventListener('click', () => {
-        if(!rowIdToAction) return;
-        confirmBtn.disabled = true;
-        confirmBtn.innerHTML = "Procesando...";
-        
-        fetch(`${SCRIPT_URL}?action=archiveRow&rol=${userRole}&rowId=${rowIdToAction}`)
-            .then(r => r.json())
-            .then(res => {
-                if(res.status === "success") {
-                    msg("Caso archivado correctamente", "success");
-                    confirmModal.hide();
-                    loadData(false);
-                } else { alert(res.message); }
-            })
-            .finally(() => {
-                confirmBtn.disabled = false; 
-                confirmBtn.innerHTML = "Sí, Archivar";
-                rowIdToAction = null;
-            });
+    
+    crmTBody.addEventListener('change', (e) => {
+        // Detectar cambio de estado
+        if (e.target.classList.contains('status-select')) {
+            updateStatus(e.target);
+        }
+        // Detectar cambio de técnico
+        if (e.target.classList.contains('tech-select')) {
+            updateAssignment(e.target);
+        }
     });
 
-    // Auto-refresh
+    // Auto-recarga cada 2 minutos
     setInterval(() => loadData(false), 120000);
+    
+    // --- FUNCIONES ---
 
-
-    // --- FUNCIONES PRINCIPALES ---
+    function setupPermissions() {
+        // Si es oficina, ocultamos la pestaña "Archivados" (Historial) y Reportes crudos
+        if (userRole === "oficina") {
+            if (archivadosTab) archivadosTab.classList.add("d-none");
+            if (archivadosTabContent) archivadosTabContent.remove(); // Eliminar del DOM para seguridad
+            if (reportesTab) reportesTab.classList.add("d-none"); // Opcional
+            
+            // Ocultar gráfico de tipos si existe
+            const chartContainer = document.getElementById("type-chart");
+            if(chartContainer) chartContainer.closest('.card').parentElement.classList.add("d-none");
+        } 
+    }
 
     function loadTechnicians() {
         return fetch(SCRIPT_URL + "?action=getTechnicians")
-            .then(r => r.json())
+            .then(res => res.json())
             .then(data => {
-                if(data.status === "success") technicianList = data.tecnicos;
+                if(data.status === "success") {
+                    technicianList = data.tecnicos;
+                }
             })
-            .catch(e => console.error(e));
+            .catch(err => console.error("Error cargando técnicos", err));
     }
 
     function loadData(showSpinner) {
-        if(showSpinner) { loadingSpinner.classList.remove("d-none"); dashboardContent.classList.add("d-none"); }
-        else msg("Sincronizando...", "info-silent");
+        if (showSpinner) { 
+            loadingSpinner.classList.remove("d-none"); 
+            dashboardContent.classList.add("d-none"); 
+        } else {
+            msg("Sincronizando...", "info-silent");
+        }
 
-        fetch(`${SCRIPT_URL}?action=getData&rol=${userRole}`)
-            .then(r => r.json())
+        fetch(SCRIPT_URL + "?action=getData&rol=" + userRole)
+            .then(res => res.json())
             .then(res => {
-                if(res.status === "success") {
-                    // Procesar fechas
-                    globalData.crm = (res.data.crm||[]).map(r => ({...r, FechaObj: new Date(r.Fecha)}));
-                    globalData.archivados = (res.data.archivados||[]).map(r => ({...r, FechaObj: new Date(r.Fecha)}));
+                if (res.status === "success") {
+                    // Convertir strings de fecha a objetos Date para poder ordenar/filtrar
+                    globalData.crm = (res.data.crm || []).map(row => ({...row, FechaObj: new Date(row.Fecha)}));
+                    globalData.archivados = (res.data.archivados || []).map(row => ({...row, FechaObj: new Date(row.Fecha)}));
                     
-                    render();
+                    render(); 
+                    if (userRole === 'admin') renderArchivados("");
                     updateStats();
-                    
-                    if(showSpinner) { loadingSpinner.classList.add("d-none"); dashboardContent.classList.remove("d-none"); }
-                    else msg("Actualizado", "success-silent");
+
+                    if (showSpinner) { 
+                        loadingSpinner.classList.add("d-none"); 
+                        dashboardContent.classList.remove("d-none"); 
+                    } else {
+                        msg("Datos actualizados.", "success-silent");
+                    }
+                } else {
+                    throw new Error(res.message);
                 }
             })
-            .catch(e => msg("Error de conexión", "error"));
+            .catch(error => {
+                loadingSpinner.classList.add("d-none");
+                msg(`Error de conexión: ${error.message}`, "error");
+            });
     }
+
+    // --- RENDERIZADO ---
 
     function getFilteredData() {
         let data = globalData.crm;
         
-        // 1. Filtro Fecha
-        const today = new Date(); today.setHours(0,0,0,0);
+        // 1. Filtro de Fecha
+        const today = new Date(); 
+        today.setHours(0,0,0,0);
+        
         if (currentFilterDate === 'today') {
             data = data.filter(r => r.FechaObj >= today);
         } else if (currentFilterDate === 'week') {
-            const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+            const weekAgo = new Date(today); 
+            weekAgo.setDate(today.getDate() - 7);
             data = data.filter(r => r.FechaObj >= weekAgo);
         }
 
-        // 2. Búsqueda Texto (Nombre, Telefono o Tecnico)
+        // 2. Buscador
         if (searchText) {
-            data = data.filter(r => 
-                String(r.Nombre).toLowerCase().includes(searchText) ||
-                String(r.Telefono).includes(searchText) ||
-                String(r['Gestionado por']).toLowerCase().includes(searchText)
+            data = data.filter(row => 
+                String(row.Nombre).toLowerCase().includes(searchText) ||
+                String(row.Telefono).includes(searchText) ||
+                String(row['Gestionado por']).toLowerCase().includes(searchText)
             );
         }
         return data;
@@ -158,166 +239,223 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function render() {
         const data = getFilteredData();
+        renderTable(data);
+        renderCharts(data);
+    }
+
+    function renderTable(data) {
         crmTBody.innerHTML = "";
 
-        // Opciones de Tecnicos
-        let techOpts = '<option value="" disabled selected>Asignar...</option>';
-        technicianList.forEach(t => techOpts += `<option value="${t}">${t}</option>`);
+        // Crear las opciones del select de técnicos UNA VEZ
+        let techOptionsHtml = `<option value="" disabled selected>Asignar...</option>`;
+        technicianList.forEach(tech => {
+            techOptionsHtml += `<option value="${tech}">${tech}</option>`;
+        });
+
+        if (data.length === 0) {
+            crmTBody.innerHTML = '<tr><td colspan="7" class="text-center py-4">No hay casos pendientes para este filtro.</td></tr>';
+            return;
+        }
 
         data.forEach(row => {
             const tr = document.createElement("tr");
+            const fechaStr = row.FechaObj.toLocaleDateString() + ' <small class="text-muted">' + row.FechaObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</small>';
             
-            // Pre-seleccionar técnico
-            let myOpts = techOpts;
+            // Configurar select de técnico con el valor actual seleccionado
+            let rowTechOpts = techOptionsHtml;
             if (row['Gestionado por']) {
-                myOpts = myOpts.replace(`value="${row['Gestionado por']}"`, `value="${row['Gestionado por']}" selected`);
-                myOpts = myOpts.replace('selected>Asignar...', '>Asignar...');
+                rowTechOpts = rowTechOpts.replace(`value="${row['Gestionado por']}"`, `value="${row['Gestionado por']}" selected`);
+                rowTechOpts = rowTechOpts.replace('selected>Asignar...', '>Asignar...'); // Quitar el selected del placeholder
             }
 
-            // Color estado
-            let statusClass = row.Estado === 'Sin contactar' ? 'status-sin-contactar' : (row.Estado === 'En proceso' ? 'status-en-proceso' : 'status-contactado');
-
             tr.innerHTML = `
-                <td>${row.FechaObj.toLocaleDateString()} <small class="text-muted">${row.FechaObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</small></td>
+                <td>${fechaStr}</td>
                 <td><div class="fw-bold">${row.Nombre}</div><small>${row.Telefono}</small></td>
                 <td>${row['Tipo de Solicitud']}</td>
                 <td>
-                    <select class="form-select form-select-sm status-select ${statusClass}" data-row-id="${row.ID}">
-                        <option value="Sin contactar" ${row.Estado=='Sin contactar'?'selected':''}>🔴 Pendiente</option>
-                        <option value="En proceso" ${row.Estado=='En proceso'?'selected':''}>🟡 En Proceso</option>
-                        <option value="Contactado" ${row.Estado=='Contactado'?'selected':''}>🟢 Finalizado</option>
+                    <select class="form-select form-select-sm status-select" data-row-id="${row.ID}">
+                        <option value="Sin contactar" ${row.Estado === 'Sin contactar' ? 'selected' : ''}>🔴 Pendiente</option>
+                        <option value="En proceso" ${row.Estado === 'En proceso' ? 'selected' : ''}>🟡 En Proceso</option>
+                        <option value="Contactado" ${row.Estado === 'Contactado' ? 'selected' : ''}>🟢 Finalizado</option>
                     </select>
                 </td>
                 <td>
                     <select class="form-select form-select-sm tech-select" data-row-id="${row.ID}">
-                        ${myOpts}
+                        ${rowTechOpts}
                     </select>
                 </td>
                 <td class="text-end">
-                    ${userRole === 'admin' ? `<button class="btn btn-sm btn-outline-warning archive-btn" data-row-id="${row.ID}" title="Archivar"><i class="bi bi-archive"></i></button>` : ''}
+                    ${userRole === 'admin' ? 
+                    `<button class="btn btn-sm btn-outline-warning archive-btn" data-row-id="${row.ID}" title="Archivar (Cerrar Caso)">
+                        <i class="bi bi-archive"></i>
+                    </button>` : ''}
                 </td>
             `;
+            
+            // Colorear el select de estado
+            updateSelectColor(tr.querySelector(".status-select"));
             crmTBody.appendChild(tr);
         });
+    }
+    
+    function renderArchivados(term) {
+        if (!archivadosTBody) return;
+        archivadosTBody.innerHTML = "";
         
-        // Render Archivados (Solo Admin)
-        if(userRole === 'admin' && archivadosTBody) {
-             archivadosTBody.innerHTML = "";
-             globalData.archivados.slice(0, 50).forEach(row => { // Limitado a 50 para velocidad
-                 const tr = document.createElement("tr");
-                 tr.innerHTML = `<td>${row.FechaObj.toLocaleDateString()}</td><td>${row.Nombre}</td><td>${row['Tipo de Solicitud']}</td><td>${row.Estado}</td><td>${row['Gestionado por']}</td><td><small>${row.ID}</small></td>`;
-                 archivadosTBody.appendChild(tr);
-             });
+        let data = globalData.archivados;
+        if (term) {
+            data = data.filter(row => 
+                String(row.Nombre).toLowerCase().includes(term) ||
+                String(row.ID).toLowerCase().includes(term)
+            );
         }
+
+        // Mostrar solo los últimos 50 para no saturar
+        data.slice(0, 50).forEach(row => {
+             const tr = document.createElement("tr");
+             tr.innerHTML = `
+                <td>${row.FechaObj.toLocaleDateString()}</td>
+                <td>${row.Nombre}</td>
+                <td>${row['Tipo de Solicitud']}</td>
+                <td>${row.Estado}</td>
+                <td>${row['Gestionado por']}</td>
+                <td><small class="text-muted">${row.ID}</small></td>
+             `;
+             archivadosTBody.appendChild(tr);
+        });
     }
 
-    // --- API ACTIONS ---
-    function updateStatus(el) {
-        // Cambiar color visualmente inmediato
-        el.className = "form-select form-select-sm status-select";
-        if(el.value === 'Sin contactar') el.classList.add('status-sin-contactar');
-        else if(el.value === 'En proceso') el.classList.add('status-en-proceso');
-        else el.classList.add('status-contactado');
+    // --- ACCIONES API ---
+    
+    function updateStatus(select) {
+        const newStatus = select.value;
+        const rowId = select.dataset.rowId;
+        updateSelectColor(select);
+        msg("Guardando estado...", "info");
 
-        fetch(`${SCRIPT_URL}?action=updateStatus&rowId=${el.dataset.rowId}&newStatus=${el.value}`)
-            .then(r=>r.json()).then(d=>{ if(d.status!='success') alert("Error al guardar estado"); });
-    }
-
-    function updateTech(el) {
-        msg(`Asignando a ${el.value}...`, "info");
-        fetch(`${SCRIPT_URL}?action=updateAssignment&rowId=${el.dataset.rowId}&technician=${el.value}`)
-            .then(r=>r.json()).then(d=>{ 
-                if(d.status=='success') msg("Técnico asignado", "success");
-                else alert("Error asignando técnico");
+        fetch(`${SCRIPT_URL}?action=updateStatus&rowId=${rowId}&newStatus=${newStatus}`)
+            .then(r => r.json())
+            .then(res => {
+                if(res.status === "success") msg("Estado actualizado", "success");
+                else msg("Error al guardar", "error");
             });
     }
 
-    // --- UTILS & REPORTING ---
+    function updateAssignment(select) {
+        const newTech = select.value;
+        const rowId = select.dataset.rowId;
+        msg(`Asignando a ${newTech}...`, "info");
 
-    function updateStats() {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const todayData = globalData.crm.filter(r => r.FechaObj >= today);
-        
-        document.getElementById("stat-total").textContent = todayData.length;
-        document.getElementById("stat-contacted").textContent = todayData.filter(r => r.Estado === 'Contactado').length;
-        document.getElementById("stat-pending").textContent = todayData.filter(r => r.Estado !== 'Contactado').length;
+        fetch(`${SCRIPT_URL}?action=updateAssignment&rowId=${rowId}&technician=${encodeURIComponent(newTech)}`)
+            .then(r => r.json())
+            .then(res => {
+                if(res.status === "success") msg(`Caso asignado a ${newTech}`, "success");
+                else msg("Error al asignar", "error");
+            });
     }
 
-    // *** FUNCIÓN MAGICA PARA IMPRIMIR PDF ***
-    function printReport() {
-        const dataToPrint = getFilteredData();
-        if(dataToPrint.length === 0) return alert("No hay datos para imprimir en la vista actual.");
+    // --- EXTRAS ---
 
-        let printWindow = window.open('', '', 'height=600,width=800');
+    function updateStats() {
+        // Calcula estadísticas basadas en el filtro actual (normalmente HOY)
+        const data = getFilteredData();
+        
+        const total = data.length;
+        const finalizados = data.filter(r => r.Estado === 'Contactado').length;
+        const pendientes = total - finalizados;
+
+        const elTotal = document.getElementById("stat-total");
+        const elOk = document.getElementById("stat-contacted");
+        const elPending = document.getElementById("stat-pending");
+
+        if(elTotal) elTotal.textContent = total;
+        if(elOk) elOk.textContent = finalizados;
+        if(elPending) elPending.textContent = pendientes;
+    }
+
+    function printReport() {
+        const data = getFilteredData();
+        if (data.length === 0) return alert("No hay datos en pantalla para imprimir.");
+
+        let printWin = window.open('', '', 'height=600,width=900');
         let html = `
             <html>
             <head>
                 <title>Hoja de Ruta - Americable</title>
                 <style>
-                    body { font-family: sans-serif; padding: 20px; }
-                    h2 { text-align: center; color: #005cbf; }
-                    p { text-align: center; font-size: 0.9rem; color: #666; margin-bottom: 20px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f2f2f2; }
-                    .footer { margin-top: 30px; font-size: 10px; text-align: right; border-top: 1px solid #ccc; padding-top: 5px;}
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #005cbf; padding-bottom: 10px; }
+                    h2 { color: #005cbf; margin: 0; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                    th { background-color: #f0f0f0; }
+                    .firma { height: 40px; }
                 </style>
             </head>
             <body>
-                <h2>Reporte de Operaciones - Americable</h2>
-                <p>Fecha de emisión: ${new Date().toLocaleString()}</p>
+                <div class="header">
+                    <h2>AMERICABLE - Hoja de Ruta / Reporte Diario</h2>
+                    <p>Fecha de Impresión: ${new Date().toLocaleString()}</p>
+                </div>
                 <table>
                     <thead>
                         <tr>
-                            <th>Fecha</th>
+                            <th>Fecha/Hora</th>
                             <th>Cliente</th>
                             <th>Teléfono</th>
-                            <th>Solicitud</th>
+                            <th>Tipo Solicitud</th>
                             <th>Técnico Asignado</th>
                             <th>Estado</th>
-                            <th>Firma Cliente</th>
+                            <th>Firma / Obs</th>
                         </tr>
                     </thead>
                     <tbody>
         `;
 
-        dataToPrint.forEach(row => {
+        data.forEach(row => {
             html += `
                 <tr>
-                    <td>${row.FechaObj.toLocaleDateString()}</td>
+                    <td>${row.FechaObj.toLocaleString()}</td>
                     <td>${row.Nombre}</td>
                     <td>${row.Telefono}</td>
                     <td>${row['Tipo de Solicitud']}</td>
-                    <td><strong>${row['Gestionado por'] || 'SIN ASIGNAR'}</strong></td>
+                    <td><strong>${row['Gestionado por'] || '---'}</strong></td>
                     <td>${row.Estado}</td>
-                    <td style="width:100px;"></td>
+                    <td class="firma"></td>
                 </tr>
             `;
         });
 
-        html += `
-                    </tbody>
-                </table>
-                <div class="footer">Generado por CRM Americable - Oficina</div>
-            </body>
-            </html>
-        `;
+        html += `</tbody></table></body></html>`;
 
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.print();
+        printWin.document.write(html);
+        printWin.document.close();
+        printWin.print();
     }
 
     function exportCSV(data, filename) {
-        if(!data.length) return alert("Sin datos");
-        const headers = ["Fecha","Nombre","Telefono","Tipo","Estado","Tecnico"];
-        let csv = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" +
-            data.map(r => `"${r.FechaObj.toLocaleDateString()}","${r.Nombre}","${r.Telefono}","${r['Tipo de Solicitud']}","${r.Estado}","${r['Gestionado por']||''}"`).join("\n");
+        if (!data.length) return alert("Sin datos para exportar");
+        const headers = ["Fecha", "Nombre", "Telefono", "Tipo", "Estado", "Tecnico"];
+        let csv = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
         
+        data.forEach(r => {
+            const row = [
+                `"${r.FechaObj.toLocaleString()}"`,
+                `"${r.Nombre}"`,
+                `"${r.Telefono}"`,
+                `"${r['Tipo de Solicitud']}"`,
+                `"${r.Estado}"`,
+                `"${r['Gestionado por'] || ''}"`
+            ];
+            csv += row.join(",") + "\n";
+        });
+
         const link = document.createElement("a");
         link.href = encodeURI(csv);
         link.download = filename;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     function setActiveBtn(e) {
@@ -325,10 +463,38 @@ document.addEventListener("DOMContentLoaded", () => {
         e.target.classList.add("active");
     }
 
+    function updateSelectColor(select) {
+        if(!select) return;
+        select.classList.remove("status-sin-contactar", "status-en-proceso", "status-contactado");
+        if (select.value === "Sin contactar") select.classList.add("status-sin-contactar");
+        else if (select.value === "En proceso") select.classList.add("status-en-proceso");
+        else select.classList.add("status-contactado");
+    }
+
     function msg(txt, type) {
         crmMessage.textContent = txt;
-        crmMessage.className = type.includes("error") ? "alert alert-danger" : (type.includes("success") ? "alert alert-success" : "alert alert-info");
-        if(type.includes("silent")) crmMessage.className += " p-1 small";
-        setTimeout(() => { crmMessage.textContent=""; crmMessage.className="";}, 4000);
+        crmMessage.className = type === 'success' ? "alert alert-success" : (type === 'error' ? "alert alert-danger" : "alert alert-info");
+        if (type.includes("silent")) crmMessage.className += " p-1 small";
+        setTimeout(() => { crmMessage.textContent=""; crmMessage.className=""; }, 4000);
+    }
+
+    // Gráfico (Solo si existe el canvas)
+    function renderCharts(data) {
+        if (!statusChartCtx) return;
+        
+        const counts = { 'Sin contactar': 0, 'En proceso': 0, 'Contactado': 0 };
+        data.forEach(r => { if(counts[r.Estado] !== undefined) counts[r.Estado]++; });
+
+        if (statusChartInstance) statusChartInstance.destroy();
+        statusChartInstance = new Chart(statusChartCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pendiente', 'En Proceso', 'Finalizado'],
+                datasets: [{
+                    data: [counts['Sin contactar'], counts['En proceso'], counts['Contactado']],
+                    backgroundColor: ['#dc3545', '#ffc107', '#198754']
+                }]
+            }
+        });
     }
 });

@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-    // ¡¡¡ PEGAR NUEVA URL AQUI !!!
-    const SCRIPT_URL = "PEGAR_LA_NUEVA_URL_DE_IMPLEMENTACION_AQUI";
+    // --- URL CORRECTA (Ya la puse por ti) ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     const userRole = sessionStorage.getItem("userRole");
     const userName = sessionStorage.getItem("userName");
@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let technicianList = [];
     let currentFilterDate = 'today';
     let searchText = "";
-    let rowIdToAction = null; // Para archivar/editar/notas
+    let rowIdToAction = null; 
 
     // INIT
     userNameDisplay.textContent = userName;
@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("filter-week").addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate='week'; render(); });
     document.getElementById("filter-all").addEventListener("click", (e) => { setActiveBtn(e); currentFilterDate='all'; render(); });
 
-    // --- DELEGACIÓN DE EVENTOS TABLA (EL CORAZÓN DEL SISTEMA) ---
+    // --- DELEGACIÓN DE EVENTOS TABLA ---
     crmTBody.addEventListener('change', (e) => {
         if (e.target.classList.contains('status-select')) updateField(e.target.dataset.rowId, 'status', e.target.value);
         if (e.target.classList.contains('tech-select')) updateField(e.target.dataset.rowId, 'tech', e.target.value);
@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('saveNoteButton').addEventListener('click', () => {
         const note = document.getElementById('new-note-input').value;
         if(!note) return;
-        const id = rowIdToAction; // Seteado al abrir el modal
+        const id = rowIdToAction; 
         
         const btn = document.getElementById('saveNoteButton');
         btn.disabled = true; btn.innerText = "...";
@@ -115,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     msg("Nota agregada", "success"); 
                     document.getElementById('new-note-input').value = "";
                     notesModal.hide();
-                    loadData(false); // Recargar para traer la nota nueva
+                    loadData(false); 
                 }
             }).finally(() => { btn.disabled = false; btn.innerText = "Agregar"; });
     });
@@ -141,18 +141,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(spinner) { loadingSpinner.classList.add("d-none"); dashboardContent.classList.remove("d-none"); }
                 else msg("Actualizado", "success-silent");
             }
+        }).catch(e => {
+             loadingSpinner.classList.add("d-none");
+             msg("Error de conexión. Verifica la URL.", "error");
         });
     }
 
     // --- RENDERIZADO ---
     function render() {
         let data = globalData.crm;
-        // Filtro Fecha
         const today = new Date(); today.setHours(0,0,0,0);
         if (currentFilterDate === 'today') data = data.filter(r => r.FechaObj >= today);
         else if (currentFilterDate === 'week') { const w = new Date(today); w.setDate(today.getDate()-7); data = data.filter(r => r.FechaObj >= w); }
         
-        // Filtro Texto
         if(searchText) data = data.filter(r => String(r.Nombre).toLowerCase().includes(searchText) || String(r.Telefono).includes(searchText));
 
         crmTBody.innerHTML = "";
@@ -164,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
         data.forEach(row => {
             const tr = document.createElement("tr");
             
-            // Prioridad (Color de fondo en la celda)
             let pColor = row.Prioridad === 'Urgente' ? 'bg-danger text-white' : (row.Prioridad === 'Alta' ? 'bg-warning' : 'bg-success text-white');
             let pBadge = `<select class="form-select form-select-sm priority-select" style="width:auto; font-size:0.8rem" data-row-id="${row.ID}">
                             <option value="Normal" ${row.Prioridad=='Normal'?'selected':''}>🟢 Normal</option>
@@ -172,14 +172,11 @@ document.addEventListener("DOMContentLoaded", () => {
                             <option value="Urgente" ${row.Prioridad=='Urgente'?'selected':''}>🔴 Urgente</option>
                           </select>`;
 
-            // Estado
             let sClass = row.Estado === 'Sin contactar' ? 'status-sin-contactar' : (row.Estado==='En proceso'?'status-en-proceso':'status-contactado');
             
-            // Tecnico
             let tOpts = techOpts;
             if(row['Gestionado por']) { tOpts = tOpts.replace(`value="${row['Gestionado por']}"`, `value="${row['Gestionado por']}" selected`); }
 
-            // Boton Notas (Color si tiene notas)
             let noteBtnClass = row.Notas && row.Notas.length > 5 ? "btn-info text-white" : "btn-outline-secondary";
 
             tr.innerHTML = `
@@ -225,7 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const row = globalData.crm.find(r => r.ID == id);
         const history = document.getElementById('notes-history');
         history.value = row.Notas || "No hay notas registradas.";
-        history.scrollTop = history.scrollHeight; // Scroll al final
+        history.scrollTop = history.scrollHeight; 
         notesModal.show();
     }
 
@@ -235,13 +232,12 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(r=>r.json()).then(d=>{
                 if(d.status==='success') {
                     msg("Guardado", "success-silent");
-                    // Actualizar visualmente en la data local sin recargar todo
                     const row = globalData.crm.find(r => r.ID == id);
                     if(row) {
                         if(field === 'status') row.Estado = value;
                         if(field === 'tech') row['Gestionado por'] = value;
                         if(field === 'priority') row.Prioridad = value;
-                        render(); // Re-renderizar para actualizar colores
+                        render(); 
                     }
                 } else alert("Error al guardar");
             });
@@ -260,20 +256,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateStats() {
-        const data = globalData.crm; // Debería ser filtrado por fecha si quieres stats del dia
+        const data = globalData.crm; 
         document.getElementById("stat-total").textContent = data.length;
         document.getElementById("stat-contacted").textContent = data.filter(r => r.Estado === 'Contactado').length;
         document.getElementById("stat-pending").textContent = data.filter(r => r.Estado !== 'Contactado').length;
     }
 
     function printReport() {
-        // Código de impresión (similar al anterior pero añadiendo prioridad y detalles)
-        // ... (Puedes usar el mismo del mensaje anterior, funciona bien)
          const data = globalData.crm.filter(r => {
             const today = new Date(); today.setHours(0,0,0,0);
             if (currentFilterDate === 'today') return r.FechaObj >= today;
             return true; 
-        }); // Usar filtro actual para imprimir
+        }); 
 
         if(data.length === 0) return alert("No hay datos");
         const logoUrl = window.location.origin + '/logo.svg';
@@ -290,9 +284,14 @@ document.addEventListener("DOMContentLoaded", () => {
         w.document.write(h); w.document.close(); setTimeout(()=>w.print(), 500);
     }
     
-    function exportCSV(data, name) { /* ... código exportar igual al anterior ... */ }
+    function exportCSV(data, name) {
+        if(!data.length) return alert("Sin datos");
+        let csv = "Fecha,Nombre,Telefono,Direccion,Detalle,Tecnico,Prioridad,Notas\n" + 
+            data.map(r => `"${r.FechaObj.toLocaleDateString()}","${r.Nombre}","${r.Telefono}","${r['Direccion_Zona']||''}","${r['Detalles']||''}","${r['Gestionado por']||''}","${r.Prioridad||''}","${r.Notas||''}"`).join("\n");
+        const link = document.createElement("a"); link.href = encodeURI("data:text/csv;charset=utf-8,"+csv); link.download = name; link.click();
+    }
+
     function setActiveBtn(e) { document.querySelectorAll(".btn-group .btn").forEach(b=>b.classList.remove("active")); e.target.classList.add("active"); }
-    function updateSelectColor(el) { /* ... igual ... */ }
     function msg(txt, type) { crmMessage.textContent = txt; crmMessage.className = `alert alert-${type.includes('error')?'danger':type.includes('success')?'success':'info'} p-1 small`; setTimeout(()=>crmMessage.textContent="",4000); }
     function setupPermissions() { if(userRole==="oficina") { document.getElementById("archivados-tab-button")?.classList.add("d-none"); document.getElementById("pills-archivados")?.remove(); } }
     function renderCharts(data) { if(!statusChartCtx) return; const c={'Sin contactar':0,'En proceso':0,'Contactado':0}; data.forEach(r=>{if(c[r.Estado]!==undefined)c[r.Estado]++}); if(statusChartInstance)statusChartInstance.destroy(); statusChartInstance=new Chart(statusChartCtx,{type:'doughnut',data:{labels:['Pendiente','En Proceso','Finalizado'],datasets:[{data:[c['Sin contactar'],c['En proceso'],c['Contactado']],backgroundColor:['#dc3545','#ffc107','#198754']}]}}); }

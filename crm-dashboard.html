@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Oficina - CRM Americable</title>
+    <title>Oficina Pro - CRM Americable</title>
     <link rel="icon" href="logo.svg" type="image/svg+xml">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -39,37 +39,34 @@
         </div>
     </nav>
 
-    <main class="container my-5">
-        <div id="loading-spinner" class="text-center py-5">
+    <main class="container-fluid px-4 my-4"> <div id="loading-spinner" class="text-center py-5">
             <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-            <p class="lead mt-3">Conectando con Oficina...</p>
+            <p class="lead mt-3">Cargando sistema...</p>
         </div>
 
         <div id="crm-message" class="my-3"></div>
 
         <div id="dashboard-content" class="d-none">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-12 col-md-auto">
-                            <label class="form-label fw-bold">Filtros de Fecha</label>
-                            <div class="btn-group w-100" role="group">
-                                <button type="button" class="btn btn-outline-secondary active" id="filter-today">Hoy</button>
-                                <button type="button" class="btn btn-outline-secondary" id="filter-week">Semana</button>
-                                <button type="button" class="btn btn-outline-secondary" id="filter-all">Todo</button>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md">
-                             <label class="form-label fw-bold">Buscar (Cliente, Teléfono o Técnico)</label>
-                             <input type="text" class="form-control" id="search-crm" placeholder="Escribe para filtrar...">
-                        </div>
+            
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-6">
+                     <div class="btn-group shadow-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary active" id="filter-today">Hoy</button>
+                        <button type="button" class="btn btn-outline-primary" id="filter-week">Semana</button>
+                        <button type="button" class="btn btn-outline-primary" id="filter-all">Todo</button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="search-crm" placeholder="Buscar cliente, teléfono, técnico...">
                     </div>
                 </div>
             </div>
 
             <ul class="nav nav-tabs nav-fill mb-3" id="pills-tab" role="tablist">
-                <li class="nav-item"><button class="nav-link active" id="pills-crm-tab" data-bs-toggle="pill" data-bs-target="#pills-crm"><i class="bi bi-list-task me-2"></i>Gestión Diaria</button></li>
-                <li class="nav-item"><button class="nav-link" id="pills-stats-tab" data-bs-toggle="pill" data-bs-target="#pills-stats"><i class="bi bi-bar-chart-line me-2"></i>Estadísticas</button></li>
+                <li class="nav-item"><button class="nav-link active" id="pills-crm-tab" data-bs-toggle="pill" data-bs-target="#pills-crm"><i class="bi bi-kanban me-2"></i>Gestión Activa</button></li>
+                <li class="nav-item"><button class="nav-link" id="pills-stats-tab" data-bs-toggle="pill" data-bs-target="#pills-stats"><i class="bi bi-graph-up me-2"></i>Métricas</button></li>
                 <li class="nav-item" id="archivados-tab-button"><button class="nav-link" id="pills-archivados-tab" data-bs-toggle="pill" data-bs-target="#pills-archivados"><i class="bi bi-archive me-2"></i>Historial</button></li>
             </ul>
             
@@ -77,93 +74,57 @@
                 
                 <div class="tab-pane fade show active" id="pills-crm" role="tabpanel">
                     <div class="card shadow-sm border-0">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="card-title mb-0 text-primary fw-bold">Casos Activos</h5>
-                                <div>
-                                    <button class="btn btn-primary me-2" id="print-report-button">
-                                        <i class="bi bi-printer-fill me-2"></i>Imprimir Hoja de Ruta
-                                    </button>
-                                    <button class="btn btn-success" id="export-crm-button" title="Descargar Excel">
-                                        <i class="bi bi-file-earmark-spreadsheet"></i>
-                                    </button>
-                                </div>
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                            <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-list-check me-2"></i>Cola de Trabajo</h5>
+                            <div>
+                                <button class="btn btn-primary btn-sm me-2" id="print-report-button"><i class="bi bi-printer-fill me-1"></i>Hoja de Ruta</button>
+                                <button class="btn btn-success btn-sm" id="export-crm-button"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
                             </div>
-                            <div class="table-responsive-lg">
-                                <table class="table table-hover align-middle" id="main-table">
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-striped mb-0" id="main-table">
                                     <thead class="table-dark">
                                         <tr>
-                                            <th>Fecha</th>
-                                            <th>Cliente / Tel</th>
+                                            <th>Prioridad</th> <th>Fecha</th>
+                                            <th>Cliente</th>
                                             <th>Solicitud</th>
                                             <th>Estado</th>
-                                            <th>Asignado a (Técnico)</th>
-                                            <th class="text-end">Acción</th>
+                                            <th>Técnico</th>
+                                            <th class="text-end">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody id="crm-table-body"></tbody>
                                 </table>
-                            </div>
-                            <div class="text-muted small mt-2">
-                                * Selecciona un técnico en el menú desplegable para asignarle el caso.
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="tab-pane fade" id="pills-stats" role="tabpanel">
-                    <div class="row">
-                         <div class="col-md-4 mb-3">
-                            <div class="card bg-primary text-white h-100">
-                                <div class="card-body text-center">
-                                    <h1 class="display-4 fw-bold" id="stat-total">0</h1>
-                                    <p class="lead">Total Casos Hoy</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="card bg-success text-white h-100">
-                                <div class="card-body text-center">
-                                    <h1 class="display-4 fw-bold" id="stat-contacted">0</h1>
-                                    <p class="lead">Atendidos / Finalizados</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="card bg-warning text-dark h-100">
-                                <div class="card-body text-center">
-                                    <h1 class="display-4 fw-bold" id="stat-pending">0</h1>
-                                    <p class="lead">Pendientes</p>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="row g-3">
+                         <div class="col-md-4"><div class="card bg-primary text-white h-100 p-3 text-center"><h1 id="stat-total" class="fw-bold">0</h1><p>Total Hoy</p></div></div>
+                         <div class="col-md-4"><div class="card bg-success text-white h-100 p-3 text-center"><h1 id="stat-contacted" class="fw-bold">0</h1><p>Finalizados</p></div></div>
+                         <div class="col-md-4"><div class="card bg-warning text-dark h-100 p-3 text-center"><h1 id="stat-pending" class="fw-bold">0</h1><p>Pendientes</p></div></div>
                     </div>
-                    <div class="row mt-3">
-                        <div class="col-md-6 offset-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <canvas id="status-chart"></canvas>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="row mt-4 justify-content-center">
+                        <div class="col-md-6"><canvas id="status-chart"></canvas></div>
                     </div>
                 </div>
 
                 <div class="tab-pane fade" id="pills-archivados" role="tabpanel">
                      <div class="card shadow-sm border-0">
                         <div class="card-body">
-                            <h5 class="card-title mb-3">Historial de Casos Cerrados</h5>
-                            <input type="text" class="form-control mb-3" id="search-archivados" placeholder="Buscar en historial...">
-                            <div class="table-responsive-lg">
-                                <table class="table table-sm table-striped">
-                                    <thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Técnico</th><th>ID</th></tr></thead>
+                            <input type="text" class="form-control mb-3" id="search-archivados" placeholder="Buscar en historial completo...">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light"><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Técnico</th><th>ID</th></tr></thead>
                                     <tbody id="archivados-table-body"></tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </main>
@@ -172,15 +133,61 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
-                    <h5 class="modal-title">Archivar Caso</h5>
+                    <h5 class="modal-title">Cerrar Caso</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
+                <div class="modal-body">¿Confirmas que este trabajo ha sido finalizado? Se moverá al historial.</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning text-dark" id="confirmActionButton">Archivar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Editar Información</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body">
-                    ¿El caso ha sido finalizado? Al archivar, se moverá al historial y saldrá de la lista diaria.
+                    <form id="edit-form">
+                        <input type="hidden" id="edit-row-id">
+                        <div class="mb-3"><label>Nombre Cliente</label><input type="text" class="form-control" id="edit-nombre" required></div>
+                        <div class="mb-3"><label>Teléfono</label><input type="text" class="form-control" id="edit-telefono" required></div>
+                        <div class="mb-3"><label>Dirección / Zona</label><input type="text" class="form-control" id="edit-direccion"></div>
+                        <div class="mb-3"><label>Detalles Avería</label><textarea class="form-control" id="edit-detalles" rows="3"></textarea></div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-warning text-dark" id="confirmActionButton">Sí, Archivar</button>
+                    <button type="button" class="btn btn-primary" id="saveEditButton">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title">Bitácora de Notas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="fw-bold">Historial:</label>
+                        <textarea class="form-control bg-light" id="notes-history" rows="6" readonly style="font-size: 0.9rem;"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="fw-bold">Agregar nueva nota:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new-note-input" placeholder="Ej: Cliente no contesta...">
+                            <button class="btn btn-info" id="saveNoteButton">Agregar</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

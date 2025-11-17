@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-    // --- URL CORRECTA (Ya la puse por ti) ---
+    // --- URL DEL SCRIPT (LA QUE ME DISTE) ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
 
     const userRole = sessionStorage.getItem("userRole");
@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Elementos
     const userNameDisplay = document.getElementById("user-name");
+    const logoutButton = document.getElementById("logout-button");
+    const reloadButton = document.getElementById("reload-button");
     const loadingSpinner = document.getElementById("loading-spinner");
     const crmMessage = document.getElementById("crm-message");
     const dashboardContent = document.getElementById("dashboard-content");
@@ -124,7 +126,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- FUNCIONES CARGA ---
     function loadTechnicians() {
-        return fetch(SCRIPT_URL + "?action=getTechnicians").then(r=>r.json()).then(d=>{ if(d.status==="success") technicianList = d.tecnicos; });
+        return fetch(SCRIPT_URL + "?action=getTechnicians")
+            .then(r=>r.json())
+            .then(d=>{ if(d.status==="success") technicianList = d.tecnicos; })
+            .catch(e => console.error("Error fetching technicians", e));
     }
 
     function loadData(spinner) {
@@ -142,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 else msg("Actualizado", "success-silent");
             }
         }).catch(e => {
+             console.error(e);
              loadingSpinner.classList.add("d-none");
              msg("Error de conexión. Verifica la URL.", "error");
         });

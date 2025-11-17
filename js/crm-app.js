@@ -1,8 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // --- URL DEL SCRIPT (LA QUE ME DISTE) ---
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
-
+// En js/crm-app.js
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyr1ke7O6kdS10eZR9nIutgH45Jj875o0u5bObxRwzQb3Y8AuGycUw6ZU6onv8rkPu6/exec";
     const userRole = sessionStorage.getItem("userRole");
     const userName = sessionStorage.getItem("userName");
     if (!userRole) { window.location.href = "index.html"; return; }
